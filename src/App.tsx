@@ -32,6 +32,7 @@ import { compileAnt, createModel, monaco, pathOf, startLanguageServer } from "./
 import {
   basename,
   browserWorkspace,
+  dirname,
   files as workspaceFiles,
   pickFolder,
   supported,
@@ -364,6 +365,25 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
     }
   };
 
+  /** moveTab moves between the open files with the arrow keys. */
+  const moveTab = (e: ReactKeyboardEvent<HTMLElement>) => {
+    const i = active ? tabs.indexOf(active) : -1;
+    const next =
+      e.key === "ArrowLeft"
+        ? tabs[i - 1]
+        : e.key === "ArrowRight"
+          ? tabs[i + 1]
+          : e.key === "Home"
+            ? tabs[0]
+            : e.key === "End"
+              ? tabs.at(-1)
+              : undefined;
+    if (!next) return;
+    e.preventDefault();
+    setActive(next);
+    e.currentTarget.querySelector<HTMLElement>(`[data-path="${CSS.escape(next)}"]`)?.focus();
+  };
+
   /** switchTab moves between the panel's tabs with the arrow keys. */
   const switchTab = (e: ReactKeyboardEvent) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -563,25 +583,47 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
                 onRefresh={() => void project.refresh()}
               />
             </div>
-            <Resizer direction="column" onResize={(d) => setSidebarWidth((w) => clamp(w + d, 160, 480))} />
+            <Resizer
+              direction="column"
+              label="Resize the file tree"
+              value={sidebarWidth}
+              min={160}
+              max={480}
+              onResize={(d) => setSidebarWidth((w) => clamp(w + d, 160, 480))}
+            />
           </>
         )}
 
         <div className="center">
-          <div className="tabs" role="tablist">
+          <div className="tabs" role="tablist" aria-label="Open files" onKeyDown={moveTab}>
             {tabs.map((path) => (
               <div
                 key={path}
                 className={"tab" + (path === active ? " active" : "")}
-                role="tab"
-                aria-selected={path === active}
                 title={path}
+                onAuxClick={(e) => e.button === 1 && close(path)}
               >
-                <button className="tab-name" onClick={() => setActive(path)}>
+                <button
+                  className="tab-name"
+                  role="tab"
+                  data-path={path}
+                  aria-selected={path === active}
+                  tabIndex={path === active ? 0 : -1}
+                  onClick={() => setActive(path)}
+                >
                   {basename(path)}
+                  {/* files of the same name tell themselves apart by their directory */}
+                  {tabs.some((t) => t !== path && basename(t) === basename(path)) && (
+                    <span className="tab-dir">{dirname(path) || "./"}</span>
+                  )}
                 </button>
                 {files.dirty.has(path) && <span className="dirty-dot" aria-label="unsaved changes" />}
-                <button className="tab-close" aria-label={`Close ${basename(path)}`} onClick={() => close(path)}>
+                <button
+                  className="tab-close"
+                  tabIndex={-1}
+                  aria-label={`Close ${basename(path)}`}
+                  onClick={() => close(path)}
+                >
                   <CloseIcon />
                 </button>
               </div>
@@ -617,7 +659,16 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
               </div>
             )}
           </div>
-          {panel.open && <Resizer direction="row" onResize={(d) => setConsoleHeight((h) => clamp(h - d, 80, 640))} />}
+          {panel.open && (
+            <Resizer
+              direction="row"
+              label="Resize the panel"
+              value={consoleHeight}
+              min={80}
+              max={640}
+              onResize={(d) => setConsoleHeight((h) => clamp(h - d, 80, 640))}
+            />
+          )}
           <section
             className={"bottom" + (panel.open ? "" : " closed")}
             style={panel.open ? { height: consoleHeight } : undefined}
@@ -699,8 +750,21 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), max);
 }
 
-/** Resizer is the edge between two panes: dragging it reports how far, in pixels. */
-function Resizer({ direction, onResize }: { direction: "row" | "column"; onResize(delta: number): void }) {
+interface ResizerProps {
+  direction: "row" | "column";
+  label: string;
+  /** The size of the pane it resizes, and the bounds of it. */
+  value: number;
+  min: number;
+  max: number;
+  onResize(delta: number): void;
+}
+
+/**
+ * Resizer is the edge between two panes: dragging it, or the arrow keys while it has the focus,
+ * report how far it moves, in pixels.
+ */
+function Resizer({ direction, label, value, min, max, onResize }: ResizerProps) {
   const last = useRef<number | null>(null);
   const at = (e: PointerEvent) => (direction === "column" ? e.clientX : e.clientY);
   return (
@@ -708,6 +772,19 @@ function Resizer({ direction, onResize }: { direction: "row" | "column"; onResiz
       className={"resizer " + direction}
       role="separator"
       aria-orientation={direction === "column" ? "vertical" : "horizontal"}
+      aria-label={label}
+      aria-valuenow={value}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        const step = e.shiftKey ? 64 : 16;
+        const keys = direction === "column" ? ["ArrowLeft", "ArrowRight"] : ["ArrowUp", "ArrowDown"];
+        const i = keys.indexOf(e.key);
+        if (i < 0) return;
+        e.preventDefault();
+        onResize(i === 0 ? -step : step);
+      }}
       onPointerDown={(e) => {
         last.current = at(e);
         e.currentTarget.setPointerCapture(e.pointerId);
