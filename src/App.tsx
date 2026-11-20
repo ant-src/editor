@@ -215,6 +215,7 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
   const [picked, setPicked] = useState<{ stop: unknown; frame: number } | null>(null); // a frame of the stack
   const [sidebar, setSidebar] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(240);
+  const [debuggerWidth, setDebuggerWidth] = useState(300);
   const [consoleHeight, setConsoleHeight] = useState(220);
   const [panel, setPanel] = useState<{ tab: "console" | "problems"; open: boolean }>({ tab: "console", open: true });
   const allProblems = useSyncExternalStore(problems.subscribe, problems.getState);
@@ -776,13 +777,24 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
         </div>
 
         {run.debugging && runner && (
-          <Variables
-            stop={stop}
-            frame={frame}
-            inspector={runner}
-            onStep={step}
-            onSelectFrame={(frame) => setPicked({ stop, frame })}
-          />
+          <>
+            <Resizer
+              direction="column"
+              label="Resize the debugger"
+              value={debuggerWidth}
+              min={220}
+              max={640}
+              onResize={(d) => setDebuggerWidth((w) => clamp(w - d, 220, 640))}
+            />
+            <Variables
+              width={debuggerWidth}
+              stop={stop}
+              frame={frame}
+              inspector={runner}
+              onStep={step}
+              onSelectFrame={(frame) => setPicked({ stop, frame })}
+            />
+          </>
         )}
       </div>
     </div>

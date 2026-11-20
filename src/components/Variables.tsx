@@ -17,6 +17,8 @@ export interface VariablesProps {
   /** The index of the selected frame of the stop. */
   frame: number;
   inspector: Inspector;
+  /** The panel's width, in pixels. */
+  width?: number;
   /** Resumes the program, when the panel shows the buttons that do. */
   onStep?(command: StepCommand): void;
   onSelectFrame(index: number): void;
@@ -57,7 +59,7 @@ function Header({ paused, onStep }: { paused: boolean; onStep?(command: StepComm
 /** How many elements of an array show at first, and how many more each time. */
 const page = 100;
 
-export function Variables({ stop, frame, inspector, onStep, onSelectFrame }: VariablesProps) {
+export function Variables({ stop, frame, inspector, width = 300, onStep, onSelectFrame }: VariablesProps) {
   // The last stop stays in view for a moment while the program runs, so that a step, which
   // resumes and stops at once, does not blink.
   const shown = useLinger(stop, 200);
@@ -77,7 +79,7 @@ export function Variables({ stop, frame, inspector, onStep, onSelectFrame }: Var
 
   if (!shown) {
     return (
-      <aside className="variables" aria-label="Debugger">
+      <aside className="variables" aria-label="Debugger" style={{ width }}>
         <Header paused={false} onStep={onStep} />
         <div className="variables-running">Running…</div>
       </aside>
@@ -86,7 +88,7 @@ export function Variables({ stop, frame, inspector, onStep, onSelectFrame }: Var
 
   const stale = shown !== stop;
   return (
-    <aside className={"variables" + (stale ? " stale" : "")} aria-label="Debugger">
+    <aside className={"variables" + (stale ? " stale" : "")} aria-label="Debugger" style={{ width }}>
       <Header paused={!stale} onStep={onStep} />
       <div className="variables-body">
         <div className={"stop-reason" + (shown.reason === "exception" ? " panic" : "")}>{describe(shown)}</div>
