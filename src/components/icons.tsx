@@ -78,6 +78,7 @@ export const NewFolderIcon = icon(
 );
 export const RefreshIcon = icon(<path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.8M13.4 2.3v2.9h-2.9" />);
 export const ChevronIcon = icon(<path d="m6 4 4 4-4 4" />);
+export const ChevronDownIcon = icon(<path d="m4.5 6.5 3.5 3.5 3.5-3.5" />);
 export const CloseIcon = icon(<path d="m4.5 4.5 7 7M11.5 4.5l-7 7" />);
 export const ClearIcon = icon(
   <>

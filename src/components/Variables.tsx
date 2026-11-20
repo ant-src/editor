@@ -1,8 +1,9 @@
 // The debugger's panel: why the program stopped, the call stack, and the variables in scope in
 // the selected frame, whose values open into their parts.
 import { useEffect, useRef, useState } from "react";
-import type { Frame, Scope, Stop, Variable } from "../run/runner";
-import { ChevronIcon } from "./icons";
+import type { Frame, Scope, StepCommand, Stop, Variable } from "../run/runner";
+import { key } from "../keys";
+import { ChevronIcon, ContinueIcon, StepIntoIcon, StepOutIcon, StepOverIcon } from "./icons";
 
 /** What the panel asks the debugger for. */
 export interface Inspector {
@@ -16,13 +17,47 @@ export interface VariablesProps {
   /** The index of the selected frame of the stop. */
   frame: number;
   inspector: Inspector;
+  /** Resumes the program, when the panel shows the buttons that do. */
+  onStep?(command: StepCommand): void;
   onSelectFrame(index: number): void;
+}
+
+const steps: { command: StepCommand; label: string; shortcut: string; icon: () => React.JSX.Element }[] = [
+  { command: "continue", label: "Continue", shortcut: "F5", icon: ContinueIcon },
+  { command: "next", label: "Step over", shortcut: "F10", icon: StepOverIcon },
+  { command: "stepIn", label: "Step into", shortcut: "F11", icon: StepIntoIcon },
+  { command: "stepOut", label: "Step out", shortcut: key("shift+F11"), icon: StepOutIcon },
+];
+
+/** Header is the panel's title, and the buttons that resume the program while it is paused. */
+function Header({ paused, onStep }: { paused: boolean; onStep?(command: StepCommand): void }) {
+  return (
+    <header className="panel-header">
+      <span className="panel-title">Debugger</span>
+      {onStep && (
+        <div className="step-buttons" role="group" aria-label="Step">
+          {steps.map(({ command, label, shortcut, icon: Icon }) => (
+            <button
+              key={command}
+              className={"icon-button " + command}
+              disabled={!paused}
+              title={`${label} (${shortcut})`}
+              aria-label={label}
+              onClick={() => onStep(command)}
+            >
+              <Icon />
+            </button>
+          ))}
+        </div>
+      )}
+    </header>
+  );
 }
 
 /** How many elements of an array show at first, and how many more each time. */
 const page = 100;
 
-export function Variables({ stop, frame, inspector, onSelectFrame }: VariablesProps) {
+export function Variables({ stop, frame, inspector, onStep, onSelectFrame }: VariablesProps) {
   // The last stop stays in view for a moment while the program runs, so that a step, which
   // resumes and stops at once, does not blink.
   const shown = useLinger(stop, 200);
@@ -43,9 +78,7 @@ export function Variables({ stop, frame, inspector, onSelectFrame }: VariablesPr
   if (!shown) {
     return (
       <aside className="variables" aria-label="Debugger">
-        <header className="panel-header">
-          <span className="panel-title">Debugger</span>
-        </header>
+        <Header paused={false} onStep={onStep} />
         <div className="variables-running">Running…</div>
       </aside>
     );
@@ -54,9 +87,7 @@ export function Variables({ stop, frame, inspector, onSelectFrame }: VariablesPr
   const stale = shown !== stop;
   return (
     <aside className={"variables" + (stale ? " stale" : "")} aria-label="Debugger">
-      <header className="panel-header">
-        <span className="panel-title">Debugger</span>
-      </header>
+      <Header paused={!stale} onStep={onStep} />
       <div className="variables-body">
         <div className={"stop-reason" + (shown.reason === "exception" ? " panic" : "")}>{describe(shown)}</div>
 

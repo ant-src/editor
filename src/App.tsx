@@ -4,19 +4,8 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Po
 import { CodeEditor } from "./components/CodeEditor";
 import { Console } from "./components/Console";
 import { FileTree } from "./components/FileTree";
-import {
-  BugIcon,
-  CloseIcon,
-  ContinueIcon,
-  FolderIcon,
-  PlayIcon,
-  SaveIcon,
-  SidebarIcon,
-  StepIntoIcon,
-  StepOutIcon,
-  StepOverIcon,
-  StopIcon,
-} from "./components/icons";
+import { BugIcon, ChevronDownIcon, CloseIcon, PlayIcon, SidebarIcon, StopIcon } from "./components/icons";
+import { Menu, type MenuEntry } from "./components/Menu";
 import { Variables } from "./components/Variables";
 import { ConsoleStore } from "./console";
 import { BreakpointStore } from "./debug/breakpoints";
@@ -30,6 +19,8 @@ import {
   type TreeNode,
   type Workspace,
 } from "./fs/workspace";
+import { zip } from "./fs/zip";
+import { key } from "./keys";
 import logo from "./logo.svg";
 import { isAnt, Project } from "./project";
 import AntWorker from "./run/ant.worker?worker";
@@ -189,7 +180,15 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
   const stop = run.status === "paused" ? run.stop : undefined;
   const frame = picked && picked.stop === stop ? picked.frame : 0;
   const location = stop?.frames[frame];
-  const canStart = runner !== null && run.status === "idle" && active !== null && isAnt(active);
+  const [lastRun, setLastRun] = useState<string | null>(null);
+  const [projectMenu, setProjectMenu] = useState<{ x: number; y: number } | null>(null);
+
+  // What Run runs: the active file when it is an Ant file, else the file that ran last, else main.ant.
+  const entry =
+    (active && isAnt(active) ? active : null) ??
+    (lastRun && project.has(lastRun) ? lastRun : null) ??
+    (project.has("main.ant") ? "main.ant" : null);
+  const canStart = runner !== null && run.status === "idle" && entry !== null;
   const running = run.status === "running" || run.status === "paused";
 
   const open = useCallback(
@@ -276,12 +275,13 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
     return () => opener.dispose();
   }, [project, open]);
 
-  const program = () => ({ files: project.sources(), path: active! });
   const start = (debug: boolean) => {
     if (!canStart) return;
+    const program = { files: project.sources(), path: entry };
+    setLastRun(entry);
     output.clear();
-    if (debug) runner.debug(program(), breakpoints.all());
-    else runner.run(program());
+    if (debug) runner.debug(program, breakpoints.all());
+    else runner.run(program);
   };
   const step = (command: StepCommand) => runner?.resume(command);
   const save = (path: string | null) =>
@@ -299,8 +299,37 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
     const place = (path: string) => moved.get(path) ?? path;
     setTabs((before) => before.map(place));
     setActive((before) => before && place(before));
+    setLastRun((before) => before && place(before));
     for (const [before, after] of moved) breakpoints.move(before, after);
   };
+
+  /** download saves the folder, as the editor shows it, as a zip archive. */
+  const download = async () => {
+    try {
+      const encoder = new TextEncoder();
+      const entries = await Promise.all(
+        (await project.snapshot()).map(async ({ path, data }) => ({
+          path: files.name + "/" + path,
+          data: typeof data === "string" ? encoder.encode(data) : new Uint8Array(await data.arrayBuffer()),
+        })),
+      );
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(zip(entries));
+      link.download = files.name + ".zip";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
+    } catch (err) {
+      output.write("stderr", `Downloading: ${(err as Error)?.message ?? err}\n`);
+    }
+  };
+
+  const projectEntries: MenuEntry[] = [
+    ...(onSaveToFolder ? [{ label: "Save to folder…", onSelect: onSaveToFolder }] : []),
+    ...(onOpenFolder ? [{ label: "Open folder…", onSelect: onOpenFolder }] : []),
+    { label: "Download as .zip", onSelect: () => void download() },
+    "separator",
+    { label: "Save all", shortcut: key("mod+shift+S"), disabled: !unsaved, onSelect: () => void project.saveAll() },
+  ];
 
   const remove = (node: TreeNode) => {
     const what = node.kind === "directory" ? `the folder ${node.path} and everything in it` : node.path;
@@ -355,39 +384,44 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
   return (
     <div className="app">
       <header className="toolbar">
-        <button
-          className="icon-button"
-          title="Toggle the file tree (⌘B)"
-          aria-label="Toggle file tree"
-          aria-pressed={sidebar}
-          onClick={() => setSidebar(!sidebar)}
-        >
-          <SidebarIcon />
-        </button>
-        <img className="toolbar-logo" src={logo} alt="" width="20" height="20" />
-        <span
-          className="project-name"
-          title={onSaveToFolder ? "Kept in this browser until you save it to a folder" : files.name}
-        >
-          {files.name}
-          {project.workspace.inBrowser && <span className="project-place">in browser</span>}
-        </span>
-        {onSaveToFolder && (
+        <div className="toolbar-start">
           <button
-            className="text-button"
-            title="Copy these files to a folder on disk and work there"
-            onClick={onSaveToFolder}
+            className="icon-button"
+            title={`Toggle the file tree (${key("mod+B")})`}
+            aria-label="Toggle file tree"
+            aria-pressed={sidebar}
+            onClick={() => setSidebar(!sidebar)}
           >
-            <SaveIcon />
-            Save to folder
+            <SidebarIcon />
           </button>
-        )}
-        {onOpenFolder && (
-          <button className="text-button" title="Open a folder on disk" onClick={onOpenFolder}>
-            <FolderIcon />
-            Open folder
+          <img className="toolbar-logo" src={logo} alt="" width="20" height="20" />
+          <button
+            className="project-button"
+            aria-haspopup="menu"
+            aria-expanded={projectMenu !== null}
+            title={files.name}
+            onClick={(e) => {
+              const box = e.currentTarget.getBoundingClientRect();
+              setProjectMenu(projectMenu ? null : { x: box.left, y: box.bottom + 4 });
+            }}
+          >
+            <span className="project-name">{files.name}</span>
+            <ChevronDownIcon />
           </button>
-        )}
+          {project.workspace.inBrowser && (
+            <button
+              className="browser-only"
+              title={
+                onSaveToFolder
+                  ? "These files are kept only in this browser. Save them to a folder on disk."
+                  : "These files are kept only in this browser. Download them as a .zip."
+              }
+              onClick={onSaveToFolder ?? (() => void download())}
+            >
+              Only in this browser
+            </button>
+          )}
+        </div>
 
         <div className="toolbar-actions">
           {!running && (
@@ -395,86 +429,58 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
               <button
                 className="action run"
                 disabled={!canStart}
-                title="Run the active file (⌘Enter)"
+                title={entry ? `Run ${entry} (${key("mod+Enter")})` : "Open an Ant file to run"}
                 onClick={() => start(false)}
               >
                 <PlayIcon />
-                Run
+                {entry ? `Run ${basename(entry)}` : "Run"}
+                <kbd>{key("mod+Enter")}</kbd>
               </button>
               <button
                 className="action"
                 disabled={!canStart}
-                title="Debug the active file (F5)"
+                title={entry ? `Debug ${entry} (F5)` : "Open an Ant file to debug"}
                 onClick={() => start(true)}
               >
                 <BugIcon />
                 Debug
+                <kbd>F5</kbd>
               </button>
             </>
-          )}
-          {running && run.debugging && (
-            <div className="step-buttons" role="group" aria-label="Debugger">
-              <button
-                className="icon-button"
-                disabled={!stop}
-                title="Continue (F5)"
-                aria-label="Continue"
-                onClick={() => step("continue")}
-              >
-                <ContinueIcon />
-              </button>
-              <button
-                className="icon-button"
-                disabled={!stop}
-                title="Step over (F10)"
-                aria-label="Step over"
-                onClick={() => step("next")}
-              >
-                <StepOverIcon />
-              </button>
-              <button
-                className="icon-button"
-                disabled={!stop}
-                title="Step into (F11)"
-                aria-label="Step into"
-                onClick={() => step("stepIn")}
-              >
-                <StepIntoIcon />
-              </button>
-              <button
-                className="icon-button"
-                disabled={!stop}
-                title="Step out (⇧F11)"
-                aria-label="Step out"
-                onClick={() => step("stepOut")}
-              >
-                <StepOutIcon />
-              </button>
-            </div>
           )}
           {running && (
             <button className="action stop" title="Stop the program (⇧F5)" onClick={() => runner?.stop()}>
               <StopIcon />
               Stop
+              <kbd>{key("shift+F5")}</kbd>
             </button>
           )}
         </div>
 
-        <span className={"status " + run.status} role="status">
-          {failure
-            ? `Ant did not load: ${failure}`
-            : run.status === "unavailable"
-              ? `Ant did not load: ${run.error}`
-              : run.status === "starting"
-                ? "Loading Ant…"
-                : run.status === "running"
-                  ? run.debugging
-                    ? "Debugging…"
-                    : "Running…"
-                  : stop
-                    ? `Paused at ${stop.frames[0]?.path ?? ""}:${stop.frames[0]?.line ?? ""}`
+        <div className="toolbar-end">
+          <span className={"status " + run.status} role="status">
+            {failure
+              ? `Ant did not load: ${failure}`
+              : run.status === "unavailable"
+                ? `Ant did not load: ${run.error}`
+                : run.status === "starting"
+                  ? "Loading Ant…"
+                  : run.status === "running"
+                    ? run.debugging
+                      ? "Debugging…"
+                      : "Running…"
                     : ""}
-        </span>
+          </span>
+        </div>
+        {projectMenu && (
+          <Menu
+            label={files.name}
+            x={projectMenu.x}
+            y={projectMenu.y}
+            entries={projectEntries}
+            onClose={() => setProjectMenu(null)}
+          />
+        )}
       </header>
 
       <div className="workbench">
@@ -563,6 +569,7 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
             stop={stop}
             frame={frame}
             inspector={runner}
+            onStep={step}
             onSelectFrame={(frame) => setPicked({ stop, frame })}
           />
         )}
