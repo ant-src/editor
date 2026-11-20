@@ -632,6 +632,24 @@ svg.icon {
   filter: drop-shadow(0 0 1px var(--bg));
 }
 
+.monaco-editor .paused-glyph.on-breakpoint::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  border-radius: 50%;
+  background: var(--breakpoint);
+}
+
+.monaco-editor .paused-glyph.on-breakpoint::before {
+  z-index: 1;
+  margin-left: -2px;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+}
+
 .monaco-editor .paused-glyph.caller::before {
   border-left-color: var(--fg-faint);
 }

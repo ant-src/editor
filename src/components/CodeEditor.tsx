@@ -125,7 +125,10 @@ export function CodeEditor(props: CodeEditorProps) {
               options: {
                 isWholeLine: true,
                 className: paused.innermost ? "paused-line" : "paused-line caller",
-                glyphMarginClassName: paused.innermost ? "paused-glyph" : "paused-glyph caller",
+                // the line's breakpoint shows under the arrow: a glyph lane shows one decoration
+                glyphMarginClassName:
+                  (paused.innermost ? "paused-glyph" : "paused-glyph caller") +
+                  (breakpoints.includes(paused.line) ? " on-breakpoint" : ""),
                 glyphMargin: { position: GlyphMarginLane.Left },
                 zIndex: 10,
               },
@@ -133,7 +136,7 @@ export function CodeEditor(props: CodeEditorProps) {
           ]
         : [],
     );
-  }, [model, paused?.line, paused?.innermost]);
+  }, [model, paused?.line, paused?.innermost, breakpoints]);
 
   useEffect(() => {
     const ed = editor.current!;
