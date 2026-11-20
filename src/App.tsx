@@ -45,7 +45,7 @@ import {
 import { zip } from "./fs/zip";
 import { key } from "./keys";
 import logo from "./logo.svg";
-import { describe, ProblemStore } from "./problems";
+import { ProblemStore, runNotes } from "./problems";
 import { isAnt, Project } from "./project";
 import { getTheme, setTheme, subscribe as onTheme, type Theme } from "./theme";
 import AntWorker from "./run/ant.worker?worker";
@@ -65,6 +65,7 @@ monaco.editor.onDidChangeMarkers(() =>
       column: m.startColumn,
       message: m.message,
       severity: m.severity,
+      code: typeof m.code === "string" ? m.code : m.code?.value,
     })),
   ),
 );
@@ -335,9 +336,7 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
     if (debug) runner.debug(program, breakpoints.all());
     else runner.run(program);
     // The run goes ahead with the errors the checker found, but the console says what they are.
-    const errors = problemList.filter((p) => p.severity === "error" && isAnt(p.path));
-    for (const p of errors.slice(0, 5)) output.write("warning", describe(p));
-    if (errors.length > 5) output.write("warning", `and ${errors.length - 5} more errors, in Problems\n`);
+    for (const note of runNotes(problemList)) output.write("warning", note);
     setPanel({ tab: "console", open: true });
   };
   const step = (command: StepCommand) => runner?.resume(command);
