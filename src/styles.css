@@ -23,8 +23,9 @@
   color-scheme: light dark;
 }
 
+/* Dark colors: the system's, unless the user picked light, or the user's pick. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #1b1b1f;
     --bg-soft: #202127;
     --bg-hover: #2c2c33;
@@ -45,6 +46,28 @@
     --number: #93c5fd;
     --keyword: #c4b5fd;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1b1b1f;
+  --bg-soft: #202127;
+  --bg-hover: #2c2c33;
+  --bg-active: rgba(139, 92, 246, 0.2);
+  --border: #2e2e32;
+  --fg: #dfdfd6;
+  --fg-muted: #a0a0a8;
+  --fg-faint: #6f6f78;
+  --accent: #8b5cf6;
+  --accent-fg: #a78bfa;
+  --green: #4ade80;
+  --red: #f87171;
+  --breakpoint: #fb7185;
+  --paused: #fbbf24;
+  --paused-bg: rgba(251, 191, 36, 0.16);
+  --warning: #fbbf24;
+  --string: #fdba74;
+  --number: #93c5fd;
+  --keyword: #c4b5fd;
 }
 
 * {

@@ -19,9 +19,12 @@ import {
   ChevronUpIcon,
   ClearIcon,
   CloseIcon,
+  MoonIcon,
   PlayIcon,
   SidebarIcon,
   StopIcon,
+  SunIcon,
+  SystemIcon,
 } from "./components/icons";
 import { Menu, type MenuEntry } from "./components/Menu";
 import { Count, Problems } from "./components/Problems";
@@ -44,6 +47,7 @@ import { key } from "./keys";
 import logo from "./logo.svg";
 import { describe, ProblemStore } from "./problems";
 import { isAnt, Project } from "./project";
+import { getTheme, setTheme, subscribe as onTheme, type Theme } from "./theme";
 import AntWorker from "./run/ant.worker?worker";
 import type { WorkerLike } from "./run/protocol";
 import { Runner, type RunnerState, type StepCommand } from "./run/runner";
@@ -551,6 +555,7 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
                       : "Running…"
                     : ""}
           </span>
+          <ThemeButton />
         </div>
         {projectMenu && (
           <Menu
@@ -745,6 +750,28 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
 }
 
 const none: readonly number[] = [];
+
+const themes: Record<Theme, { next: Theme; label: string; icon: () => React.JSX.Element }> = {
+  system: { next: "light", label: "System colors", icon: SystemIcon },
+  light: { next: "dark", label: "Light colors", icon: SunIcon },
+  dark: { next: "system", label: "Dark colors", icon: MoonIcon },
+};
+
+/** ThemeButton shows the colors in use, and goes on to the next: system, light, dark. */
+function ThemeButton() {
+  const theme = useSyncExternalStore(onTheme, getTheme);
+  const { next, label, icon: Icon } = themes[theme];
+  return (
+    <button
+      className="icon-button"
+      title={`${label}; switch to ${themes[next].label.toLowerCase()}`}
+      aria-label={`${label}; switch to ${themes[next].label.toLowerCase()}`}
+      onClick={() => setTheme(next)}
+    >
+      <Icon />
+    </button>
+  );
+}
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), max);

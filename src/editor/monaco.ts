@@ -6,6 +6,7 @@ import EditorWorker from "monaco-editor/editor/editor.worker?worker";
 import { setupAnt, type AntLanguageServer } from "@ant-lang/monaco";
 import LanguageServerWorker from "@ant-lang/monaco/worker?worker";
 import wasmUrl from "@ant-lang/wasm/ant.wasm?url";
+import { isDark, subscribe } from "../theme";
 import { defineThemes } from "./themes";
 
 export { monaco };
@@ -50,7 +51,6 @@ export function createModel(path: string, text: string): monaco.editor.ITextMode
   return monaco.editor.createModel(text, path.endsWith(".ant") ? "ant" : undefined, uri);
 }
 
-const dark = window.matchMedia("(prefers-color-scheme: dark)");
-const applyTheme = () => monaco.editor.setTheme(dark.matches ? "ant-dark" : "ant-light");
-dark.addEventListener("change", applyTheme);
+const applyTheme = () => monaco.editor.setTheme(isDark() ? "ant-dark" : "ant-light");
+subscribe(applyTheme);
 applyTheme();

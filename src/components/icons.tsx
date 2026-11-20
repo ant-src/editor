@@ -102,3 +102,16 @@ export const WarningIcon = icon(
     <path d="M8 6.3v3M8 11.4v.1" />
   </>,
 );
+export const SunIcon = icon(
+  <>
+    <circle cx="8" cy="8" r="2.8" />
+    <path d="M8 1.8v1.4M8 12.8v1.4M1.8 8h1.4M12.8 8h1.4M3.6 3.6l1 1M11.4 11.4l1 1M3.6 12.4l1-1M11.4 4.6l1-1" />
+  </>,
+);
+export const MoonIcon = icon(<path d="M13 9.6A5.4 5.4 0 0 1 6.4 3a5.4 5.4 0 1 0 6.6 6.6Z" />);
+export const SystemIcon = icon(
+  <>
+    <rect x="2" y="2.8" width="12" height="8.4" rx="1.3" />
+    <path d="M5.8 13.6h4.4M8 11.2v2.4" />
+  </>,
+);
