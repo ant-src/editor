@@ -91,7 +91,7 @@ ol {
   padding: 0;
 }
 
-.icon {
+svg.icon {
   flex: none;
   display: block;
 }
@@ -380,7 +380,7 @@ ol {
   flex-direction: column;
 }
 
-.tree {
+.file-tree .tree {
   flex: 1;
   overflow: auto;
   padding-bottom: 12px;
