@@ -12,7 +12,9 @@ export type MenuEntry =
       /** The key that does the same, shown at the end. */
       shortcut?: string;
     }
-  | "separator";
+  | "separator"
+  /** A line of text that is not an item, such as a note at the top. */
+  | { caption: string };
 
 export interface MenuProps {
   entries: MenuEntry[];
@@ -86,6 +88,10 @@ export function Menu({ entries, x, y, label, onClose }: MenuProps) {
       {entries.map((entry, i) =>
         entry === "separator" ? (
           <div key={i} className="menu-separator" role="separator" />
+        ) : "caption" in entry ? (
+          <div key={i} className="menu-caption" role="presentation">
+            {entry.caption}
+          </div>
         ) : (
           <button
             key={i}

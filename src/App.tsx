@@ -398,6 +398,7 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
   };
 
   const projectEntries: MenuEntry[] = [
+    ...(project.workspace.inBrowser ? [{ caption: "Kept in this browser" }] : []),
     ...(onSaveToFolder ? [{ label: "Save to folder…", onSelect: onSaveToFolder }] : []),
     ...(onOpenFolder ? [{ label: "Open folder…", onSelect: onOpenFolder }] : []),
     { label: "Download as .zip", onSelect: () => void download() },
@@ -474,7 +475,7 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
             className="project-button"
             aria-haspopup="menu"
             aria-expanded={projectMenu !== null}
-            title={files.name}
+            title={project.workspace.inBrowser ? `${files.name}, kept in this browser` : files.name}
             onClick={(e) => {
               const box = e.currentTarget.getBoundingClientRect();
               setProjectMenu(projectMenu ? null : { x: box.left, y: box.bottom + 4 });
@@ -483,19 +484,6 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
             <span className="project-name">{files.name}</span>
             <ChevronDownIcon />
           </button>
-          {project.workspace.inBrowser && (
-            <button
-              className="browser-only"
-              title={
-                onSaveToFolder
-                  ? "These files are kept only in this browser. Save them to a folder on disk."
-                  : "These files are kept only in this browser. Download them as a .zip."
-              }
-              onClick={onSaveToFolder ?? (() => void download())}
-            >
-              Only in this browser
-            </button>
-          )}
         </div>
 
         <div className="toolbar-actions">
