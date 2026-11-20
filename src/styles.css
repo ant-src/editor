@@ -218,6 +218,35 @@ svg.icon {
   background: var(--bg-hover);
 }
 
+.project-rename {
+  width: 200px;
+  height: 26px;
+  padding: 0 7px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+}
+
+.project-rename:focus-visible {
+  outline: none;
+}
+
+.project-rename.invalid {
+  border-color: var(--red);
+}
+
+.project-rename-error {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--red);
+}
+
 .project-name {
   display: block;
   overflow: hidden;

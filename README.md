@@ -3,10 +3,11 @@
 Edit, run and debug [Ant](https://ant-lang.org) programs in the browser, with nothing installed:
 [editor.ant-lang.org](https://editor.ant-lang.org).
 
-- **Files.** Work starts in a folder the browser keeps for the page. The project's menu downloads
-  it as a .zip in any browser; in Chrome and Edge on a desktop, _Save to folder_ moves it to a
-  folder on disk and _Open folder_ opens one that exists. A right click in the file tree makes,
-  renames and deletes files; a drag moves them.
+- **Projects.** Work starts in a project the browser keeps for the page. The project's menu makes
+  new ones, renames them, and switches between them; switching saves the one left. It downloads a
+  project as a .zip in any browser; in Chrome and Edge on a desktop, _Save to folder_ moves it to a
+  folder on disk and _Open folder_ opens one that exists.
+- **Files.** A right click in the file tree makes, renames and deletes files; a drag moves them.
 - **Run.** Run starts the file named beside it, in WebAssembly, in a worker. _Current File_ is the
   Ant file open in the editor; pick a file that ran before to run it from any tab. _Stop_ ends it.
 - **Problems.** The checker's errors and warnings list under _Problems_, and a run names them in

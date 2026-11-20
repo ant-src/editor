@@ -176,6 +176,12 @@ export class Project {
     for (const path of this.state.dirty) await this.save(path);
   }
 
+  /** setName names a project kept in the browser; a folder on disk keeps its own name. */
+  setName(name: string) {
+    this.workspace.setName(name);
+    this.update({ name: this.workspace.name });
+  }
+
   async createFile(path: string): Promise<void> {
     await this.workspace.createFile(path);
     await this.refresh();

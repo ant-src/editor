@@ -29,17 +29,23 @@ export const maxFileSize = 2 << 20;
 
 export class Workspace {
   /**
-   * inBrowser says that the folder is the one the browser keeps for the page, not one on disk;
-   * label names it then.
+   * inBrowser says that the folder is one the browser keeps for the page, not one on disk;
+   * label names it then, and id is the project's in the browser's list.
    */
   constructor(
     readonly root: FileSystemDirectoryHandle,
     readonly inBrowser = false,
     private label?: string,
+    readonly id?: string,
   ) {}
 
   get name(): string {
     return this.label ?? this.root.name;
+  }
+
+  /** setName gives a folder in the browser another name; one on disk keeps its own. */
+  setName(name: string) {
+    if (this.inBrowser) this.label = name;
   }
 
   /** tree lists the folder, recursively. */
@@ -297,23 +303,46 @@ for name in ["world", "ant"] {
 }
 `;
 
+/** Folders keeps the folders of the projects in the browser, by the project's id. */
+export interface Folders {
+  /** open returns the project's folder, made when there is none. */
+  open(id: string): Promise<FileSystemDirectoryHandle>;
+  /** remove deletes the project's folder and what is in it. */
+  remove(id: string): Promise<void>;
+}
+
+/** The id of the project the editor kept before it kept several: its folder stays where it was. */
+export const firstProject = "workspace";
+
 /**
- * browserWorkspace opens the folder the browser keeps for the page, which outlives the page, and
- * puts the starter program there when it is empty. It is in the origin private file system, or,
- * where a page cannot write there (Safari before 26, a private window), in localStorage.
+ * browserFolders keeps the projects' folders in the origin private file system, or, where a page
+ * cannot write there (Safari before 26, a private window), in localStorage.
  */
-export async function browserWorkspace(): Promise<Workspace> {
-  const start = async (root: FileSystemDirectoryHandle) => {
-    const workspace = new Workspace(root, true, "Untitled");
-    if ((await workspace.tree()).nodes.length === 0) await workspace.write("main.ant", starter);
-    return workspace;
-  };
+export async function browserFolders(): Promise<Folders> {
   try {
     if (typeof FileSystemFileHandle.prototype.createWritable !== "function") throw new Error("no createWritable");
-    return await start(
-      await (await navigator.storage.getDirectory()).getDirectoryHandle("workspace", { create: true }),
-    );
+    const root = await navigator.storage.getDirectory();
+    const parent = (id: string) =>
+      id === firstProject ? Promise.resolve(root) : root.getDirectoryHandle("projects", { create: true });
+    return {
+      open: async (id) => (await parent(id)).getDirectoryHandle(id, { create: true }),
+      remove: async (id) => {
+        try {
+          await (await parent(id)).removeEntry(id, { recursive: true });
+        } catch (err) {
+          if (!isNotFound(err)) throw err;
+        }
+      },
+    };
   } catch {
-    return start(handle(stored("ant-editor-workspace")));
+    const key = (id: string) => (id === firstProject ? "ant-editor-workspace" : "ant-editor-project:" + id);
+    return {
+      open: async (id) => handle(stored(key(id))),
+      remove: async (id) => {
+        try {
+          localStorage.removeItem(key(id));
+        } catch {}
+      },
+    };
   }
 }

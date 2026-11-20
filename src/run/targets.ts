@@ -113,9 +113,20 @@ export function moveTargets(from: string, to: string, storage: KeyValue | undefi
   } catch {}
 }
 
-/** targetsKey is where the browser keeps the targets of a project. */
-export function targetsKey(workspace: { inBrowser: boolean; name: string }): string {
-  return "ant-editor-run:" + (workspace.inBrowser ? "(browser)" : workspace.name);
+/**
+ * targetsKey is where the browser keeps the targets of a project: one kept in the browser by its
+ * id, the first of them where it was before there were several, and a folder on disk by its name.
+ */
+export function targetsKey(workspace: { inBrowser: boolean; name: string; id?: string }): string {
+  if (!workspace.inBrowser) return "ant-editor-run:" + workspace.name;
+  return "ant-editor-run:(browser)" + (workspace.id && workspace.id !== "workspace" ? "/" + workspace.id : "");
+}
+
+/** forgetTargets drops the targets kept under a key, as when a project is deleted. */
+export function forgetTargets(key: string, storage: KeyValue | undefined = browserStorage()) {
+  try {
+    storage?.removeItem(key);
+  } catch {}
 }
 
 function load(storage: KeyValue | undefined, key: string): TargetsState {

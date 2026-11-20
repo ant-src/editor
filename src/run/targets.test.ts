@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { moveTargets, RunTargets, targetsKey, type KeyValue } from "./targets";
+import { forgetTargets, moveTargets, RunTargets, targetsKey, type KeyValue } from "./targets";
 
 function memory(): KeyValue & { data: Map<string, string> } {
   const data = new Map<string, string>();
@@ -81,4 +81,8 @@ test("the browser keeps the targets for each project, and moves them with it", (
   expect(new RunTargets("project", storage).getState()).toEqual({ selected: null, files: [] });
   expect(targetsKey({ inBrowser: true, name: "Untitled" })).toBe("ant-editor-run:(browser)");
   expect(targetsKey({ inBrowser: false, name: "app" })).toBe("ant-editor-run:app");
+  expect(targetsKey({ inBrowser: true, name: "Untitled", id: "workspace" })).toBe("ant-editor-run:(browser)");
+  expect(targetsKey({ inBrowser: true, name: "Untitled 2", id: "p1" })).toBe("ant-editor-run:(browser)/p1");
+  forgetTargets("folder", storage);
+  expect(new RunTargets("folder", storage).getState()).toEqual({ selected: null, files: [] });
 });

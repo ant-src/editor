@@ -34,7 +34,7 @@ import { BreakpointStore } from "./debug/breakpoints";
 import { compileAnt, createModel, monaco, pathOf, startLanguageServer } from "./editor/monaco";
 import {
   basename,
-  browserWorkspace,
+  browserFolders,
   dirname,
   files as workspaceFiles,
   pickFolder,
@@ -42,6 +42,7 @@ import {
   type TreeNode,
   type Workspace,
 } from "./fs/workspace";
+import { BrowserProjects, type ProjectsState } from "./fs/projects";
 import { zip } from "./fs/zip";
 import { key } from "./keys";
 import logo from "./logo.svg";
@@ -51,7 +52,7 @@ import { getTheme, setTheme, subscribe as onTheme, type Theme } from "./theme";
 import AntWorker from "./run/ant.worker?worker";
 import type { WorkerLike } from "./run/protocol";
 import { Runner, type RunnerState, type StepCommand } from "./run/runner";
-import { moveTargets, RunTargets, targetsKey } from "./run/targets";
+import { forgetTargets, moveTargets, RunTargets, targetsKey } from "./run/targets";
 
 const output = new ConsoleStore();
 const breakpoints = new BreakpointStore();
@@ -92,6 +93,7 @@ export function App() {
   const [opened, setOpened] = useState(0); // counts the folders opened
   const [error, setError] = useState("");
   const current = useRef<Project | null>(null);
+  const [projects, setProjects] = useState<BrowserProjects | null>(null);
 
   useEffect(() => {
     boot().then(setRunner, (err) => setFailure(String(err?.message ?? err)));
@@ -111,27 +113,99 @@ export function App() {
     setOpened((n) => n + 1);
   }, []);
 
-  // Work starts at once, in the folder the browser keeps for the page.
+  // Work starts at once, in the project kept in the browser that was used last.
+  const started = useRef(false);
   useEffect(() => {
-    if (current.current) return;
-    browserWorkspace().then(
-      (workspace) => void (!current.current && show(workspace)),
-      (err) => setError(String(err?.message ?? err)),
-    );
+    if (started.current) return;
+    started.current = true;
+    browserFolders()
+      .then((folders) => {
+        const list = new BrowserProjects(folders);
+        setProjects(list);
+        return list.openLast();
+      })
+      .then(
+        (workspace) => void (!current.current && show(workspace)),
+        (err) => setError(String(err?.message ?? err)),
+      );
   }, [show]);
+
+  /**
+   * leave readies the open project to give way to another: one in the browser saves its changes,
+   * a folder on disk with unsaved ones asks first. It reports whether to go on.
+   */
+  const leave = useCallback(async (): Promise<boolean> => {
+    const from = current.current;
+    if (from?.workspace.inBrowser) await from.saveAll();
+    else if (from && from.getState().dirty.size > 0) {
+      if (!window.confirm(`${from.workspace.name} has unsaved changes. Leave without saving them?`)) return false;
+    }
+    runner?.stop();
+    output.clear();
+    return true;
+  }, [runner]);
 
   const openFolder = useCallback(async () => {
     setError("");
     try {
       const workspace = await pickFolder();
-      if (!workspace) return;
-      runner?.stop();
-      output.clear();
+      if (!workspace || !(await leave())) return;
       await show(workspace);
     } catch (err) {
       setError(String((err as Error)?.message ?? err));
     }
-  }, [runner, show]);
+  }, [leave, show]);
+
+  const newProject = useCallback(async () => {
+    if (!projects || !(await leave())) return;
+    await show(await projects.create());
+  }, [projects, leave, show]);
+
+  const openProject = useCallback(
+    async (id: string) => {
+      const from = current.current?.workspace;
+      if (!projects || (from?.inBrowser && from.id === id) || !(await leave())) return;
+      await show(await projects.open(id));
+    },
+    [projects, leave, show],
+  );
+
+  /** deleteProject deletes a project kept in the browser, and opens another in its place if it was open. */
+  const deleteProject = useCallback(
+    async (id: string) => {
+      const project = projects?.getState().projects.find((p) => p.id === id);
+      if (!projects || !project || !window.confirm(`Delete the project ${project.name} and its files?`)) return;
+      try {
+        const from = current.current?.workspace;
+        if (from?.inBrowser && from.id === id) {
+          runner?.stop();
+          output.clear();
+          const next = projects.getState().projects.find((p) => p.id !== id);
+          await show(next ? await projects.open(next.id) : await projects.create());
+        }
+        await projects.remove(id);
+        forgetTargets(targetsKey({ inBrowser: true, name: project.name, id }));
+      } catch (err) {
+        output.write("stderr", `Deleting ${project.name}: ${(err as Error)?.message ?? err}\n`);
+      }
+    },
+    [projects, runner, show],
+  );
+
+  /** renameProject names the open project, or says why it cannot. */
+  const renameProject = useCallback(
+    (name: string): string | undefined => {
+      const open = current.current;
+      if (!projects || !open?.workspace.inBrowser || !open.workspace.id) return;
+      try {
+        projects.rename(open.workspace.id, name);
+      } catch (err) {
+        return (err as Error).message;
+      }
+      open.setName(name.trim());
+    },
+    [projects],
+  );
 
   /** saveToFolder copies the files kept in the browser to a folder on disk, and works there from then on. */
   const saveToFolder = useCallback(async () => {
@@ -147,12 +221,12 @@ export function App() {
       await from.workspace.copyTo(target);
       moveTargets(targetsKey(from.workspace), targetsKey(target)); // the files to run come along
       await show(target, true);
-      await from.workspace.clear(); // the next start is a new workspace
+      if (from.workspace.id) await projects?.remove(from.workspace.id); // it lives on disk now
       output.write("info", `Saved to the folder ${target.name}\n`);
     } catch (err) {
       output.write("stderr", `Saving to a folder: ${(err as Error)?.message ?? err}\n`);
     }
-  }, [runner, show]);
+  }, [runner, show, projects]);
 
   if (!project) {
     return <Welcome error={error} />;
@@ -165,6 +239,11 @@ export function App() {
       failure={failure}
       onOpenFolder={supported() ? openFolder : undefined}
       onSaveToFolder={supported() && project.workspace.inBrowser ? saveToFolder : undefined}
+      projects={projects}
+      onNewProject={newProject}
+      onOpenProject={openProject}
+      onDeleteProject={deleteProject}
+      onRenameProject={renameProject}
     />
   );
 }
@@ -202,9 +281,22 @@ interface IdeProps {
   onOpenFolder?: () => void;
   /** Saves the files kept in the browser to a folder on disk, while the project is there. */
   onSaveToFolder?: () => void;
+  /** The projects kept in the browser, once their list is read. */
+  projects: BrowserProjects | null;
+  onNewProject(): void;
+  onOpenProject(id: string): void;
+  onDeleteProject(id: string): void;
+  /** Names the open project, or returns why it cannot. */
+  onRenameProject(name: string): string | undefined;
 }
 
-function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProps) {
+const noProjects: ProjectsState = { projects: [], last: null };
+
+function Ide(props: IdeProps) {
+  const { project, runner, failure, onOpenFolder, onSaveToFolder, projects } = props;
+  const { onNewProject, onOpenProject, onDeleteProject, onRenameProject } = props;
+  const browser = useSyncExternalStore(projects?.subscribe ?? noSubscription, projects?.getState ?? (() => noProjects));
+  const [renaming, setRenaming] = useState(false);
   const files = useSyncExternalStore(project.subscribe, project.getState);
   const run = useSyncExternalStore(runner?.subscribe ?? noSubscription, runner?.getState ?? (() => starting));
   const marks = useSyncExternalStore(breakpoints.subscribe, breakpoints.getState);
@@ -426,8 +518,21 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
       : [{ caption: "Files you run show here" }]),
   ];
 
+  const inBrowser = project.workspace.inBrowser;
   const projectEntries: MenuEntry[] = [
-    ...(project.workspace.inBrowser ? [{ caption: "Kept in this browser" }] : []),
+    { label: "New project", onSelect: () => void onNewProject() },
+    ...(inBrowser ? [{ label: "Rename…", onSelect: () => setRenaming(true) }] : []),
+    ...(browser.projects.length > 0
+      ? (["separator", { caption: "In this browser" }] as MenuEntry[]).concat(
+          browser.projects.map((p) => ({
+            label: p.name,
+            checked: inBrowser && p.id === project.workspace.id,
+            onSelect: () => void onOpenProject(p.id),
+            onRemove: () => void onDeleteProject(p.id),
+          })),
+        )
+      : []),
+    "separator",
     ...(onSaveToFolder ? [{ label: "Save to folder…", onSelect: onSaveToFolder }] : []),
     ...(onOpenFolder ? [{ label: "Open folder…", onSelect: onOpenFolder }] : []),
     { label: "Download as .zip", onSelect: () => void download() },
@@ -501,19 +606,24 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
             <SidebarIcon />
           </button>
           <img className="toolbar-logo" src={logo} alt="" width="20" height="20" />
-          <button
-            className="project-button"
-            aria-haspopup="menu"
-            aria-expanded={projectMenu !== null}
-            title={project.workspace.inBrowser ? `${files.name}, kept in this browser` : files.name}
-            onClick={(e) => {
-              const box = e.currentTarget.getBoundingClientRect();
-              setProjectMenu(projectMenu ? null : { x: box.left, y: box.bottom + 4 });
-            }}
-          >
-            <span className="project-name">{files.name}</span>
-            <ChevronDownIcon />
-          </button>
+          {renaming ? (
+            <NameInput name={files.name} onSubmit={onRenameProject} onDone={() => setRenaming(false)} />
+          ) : (
+            <button
+              className="project-button"
+              aria-haspopup="menu"
+              aria-expanded={projectMenu !== null}
+              title={inBrowser ? `${files.name}, kept in this browser` : files.name}
+              onClick={(e) => {
+                const box = e.currentTarget.getBoundingClientRect();
+                setProjectMenu(projectMenu ? null : { x: box.left, y: box.bottom + 4 });
+              }}
+              onDoubleClick={() => inBrowser && setRenaming(true)}
+            >
+              <span className="project-name">{files.name}</span>
+              <ChevronDownIcon />
+            </button>
+          )}
         </div>
 
         <div className="toolbar-end">
@@ -797,6 +907,48 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
 }
 
 const none: readonly number[] = [];
+
+/** NameInput edits a project's name in place: Enter or leaving it keeps the name, Escape does not. */
+function NameInput(props: { name: string; onSubmit(name: string): string | undefined; onDone(): void }) {
+  const { name, onSubmit, onDone } = props;
+  const [value, setValue] = useState(name);
+  const [error, setError] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => input.current?.select(), []);
+  const submit = () => {
+    if (value.trim() === name) return onDone();
+    const problem = onSubmit(value);
+    if (problem) setError(problem);
+    else onDone();
+  };
+  return (
+    <>
+      <input
+        ref={input}
+        className={"project-rename" + (error ? " invalid" : "")}
+        value={value}
+        spellCheck={false}
+        aria-label="Project name"
+        aria-invalid={error !== ""}
+        aria-describedby={error ? "project-rename-error" : undefined}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setError("");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+          if (e.key === "Escape") onDone();
+        }}
+        onBlur={() => (error ? onDone() : submit())}
+      />
+      {error && (
+        <span id="project-rename-error" className="project-rename-error" role="alert">
+          {error}
+        </span>
+      )}
+    </>
+  );
+}
 
 const themes: Record<Theme, { next: Theme; label: string; icon: () => React.JSX.Element }> = {
   system: { next: "light", label: "System colors", icon: SystemIcon },
