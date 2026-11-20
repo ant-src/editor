@@ -516,52 +516,6 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
           </button>
         </div>
 
-        <div className="toolbar-actions">
-          <button
-            className="target-button"
-            aria-haspopup="menu"
-            aria-expanded={targetMenu !== null}
-            title={picks.selected ? `Run and debug ${picks.selected}` : "Run and debug the file open in the editor"}
-            onClick={(e) => {
-              const box = e.currentTarget.getBoundingClientRect();
-              setTargetMenu(targetMenu ? null : { x: box.left, y: box.bottom + 4 });
-            }}
-          >
-            <span className="target-name">{picks.selected ? basename(picks.selected) : "Current File"}</span>
-            <ChevronDownIcon />
-          </button>
-          {/* Stop takes Run's place while a program runs, so that nothing else moves */}
-          {running ? (
-            <button
-              className="icon-button stop"
-              title={`Stop the program (${key("shift+F5")})`}
-              aria-label="Stop"
-              onClick={() => runner?.stop()}
-            >
-              <StopIcon />
-            </button>
-          ) : (
-            <button
-              className="icon-button run"
-              disabled={!canStart}
-              title={entry ? `Run ${entry} (${key("mod+Enter")})` : "Open an Ant file to run it"}
-              aria-label={entry ? `Run ${entry}` : "Run"}
-              onClick={() => start(false)}
-            >
-              <RunIcon />
-            </button>
-          )}
-          <button
-            className="icon-button debug"
-            disabled={!canStart}
-            title={entry ? `Debug ${entry} (F5)` : "Open an Ant file to debug it"}
-            aria-label={entry ? `Debug ${entry}` : "Debug"}
-            onClick={() => start(true)}
-          >
-            <BugIcon />
-          </button>
-        </div>
-
         <div className="toolbar-end">
           {problemList.length > 0 && (
             <button
@@ -585,6 +539,51 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
                       : "Running…"
                     : ""}
           </span>
+          <div className="toolbar-actions">
+            <button
+              className="target-button"
+              aria-haspopup="menu"
+              aria-expanded={targetMenu !== null}
+              title={picks.selected ? `Run and debug ${picks.selected}` : "Run and debug the file open in the editor"}
+              onClick={(e) => {
+                const box = e.currentTarget.getBoundingClientRect();
+                setTargetMenu(targetMenu ? null : { x: box.left, y: box.bottom + 4 });
+              }}
+            >
+              <span className="target-name">{picks.selected ? basename(picks.selected) : "Current File"}</span>
+              <ChevronDownIcon />
+            </button>
+            {/* Stop takes Run's place while a program runs, so that nothing else moves */}
+            {running ? (
+              <button
+                className="icon-button stop"
+                title={`Stop the program (${key("shift+F5")})`}
+                aria-label="Stop"
+                onClick={() => runner?.stop()}
+              >
+                <StopIcon />
+              </button>
+            ) : (
+              <button
+                className="icon-button run"
+                disabled={!canStart}
+                title={entry ? `Run ${entry} (${key("mod+Enter")})` : "Open an Ant file to run it"}
+                aria-label={entry ? `Run ${entry}` : "Run"}
+                onClick={() => start(false)}
+              >
+                <RunIcon />
+              </button>
+            )}
+            <button
+              className="icon-button debug"
+              disabled={!canStart}
+              title={entry ? `Debug ${entry} (F5)` : "Open an Ant file to debug it"}
+              aria-label={entry ? `Debug ${entry}` : "Debug"}
+              onClick={() => start(true)}
+            >
+              <BugIcon />
+            </button>
+          </div>
           <ThemeButton />
         </div>
         {targetMenu && (

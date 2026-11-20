@@ -166,8 +166,7 @@ svg.icon {
 .toolbar {
   flex: none;
   height: 44px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
   gap: 12px;
   padding: 0 10px;
@@ -183,7 +182,13 @@ svg.icon {
   gap: 6px;
 }
 
+.toolbar-start {
+  flex: 1;
+}
+
 .toolbar-end {
+  flex: none;
+  max-width: 70%;
   justify-content: flex-end;
 }
 
@@ -238,6 +243,8 @@ svg.icon {
 }
 
 .toolbar-actions {
+  flex: none;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
