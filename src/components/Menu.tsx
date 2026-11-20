@@ -1,6 +1,7 @@
 // A menu that opens at a point: a context menu, or the menu under a button. Arrow keys move
 // between its items, Escape and a click elsewhere close it, and focus goes back where it was.
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { CheckIcon, CloseIcon } from "./icons";
 
 export type MenuEntry =
   | {
@@ -11,6 +12,10 @@ export type MenuEntry =
       danger?: boolean;
       /** The key that does the same, shown at the end. */
       shortcut?: string;
+      /** For one of a set of choices: whether it is the one chosen. */
+      checked?: boolean;
+      /** Takes the item off the menu, from a button beside it or the Delete key. */
+      onRemove?(): void;
     }
   | "separator"
   /** A line of text that is not an item, such as a note at the top. */
@@ -61,6 +66,9 @@ export function Menu({ entries, x, y, label, onClose }: MenuProps) {
     };
   }, []);
 
+  // Items of a set of choices leave room for the check mark, all of them alike.
+  const checkable = entries.some((e) => typeof e === "object" && "onSelect" in e && e.checked !== undefined);
+
   const onKeyDown = (e: KeyboardEvent) => {
     const all = items(menu.current!);
     const i = all.indexOf(document.activeElement as HTMLButtonElement);
@@ -70,7 +78,16 @@ export function Menu({ entries, x, y, label, onClose }: MenuProps) {
     else if (e.key === "Home") go(0);
     else if (e.key === "End") go(all.length - 1);
     else if (e.key === "Escape" || e.key === "Tab") onClose();
-    else return;
+    else if ((e.key === "Delete" || e.key === "Backspace") && i >= 0) {
+      const entry = entries[Number(all[i].dataset.index)];
+      if (typeof entry !== "object" || !("onSelect" in entry) || !entry.onRemove) return;
+      entry.onRemove();
+      // the item in its place takes the focus, once the menu shows the shorter list
+      requestAnimationFrame(() => {
+        const now = menu.current ? items(menu.current) : [];
+        now[Math.min(i, now.length - 1)]?.focus();
+      });
+    } else return;
     e.preventDefault();
     e.stopPropagation();
   };
@@ -93,19 +110,34 @@ export function Menu({ entries, x, y, label, onClose }: MenuProps) {
             {entry.caption}
           </div>
         ) : (
-          <button
-            key={i}
-            className={"menu-item" + (entry.danger ? " danger" : "")}
-            role="menuitem"
-            disabled={entry.disabled}
-            onClick={() => {
-              onClose();
-              entry.onSelect();
-            }}
-          >
-            <span>{entry.label}</span>
-            {entry.shortcut && <kbd className="menu-shortcut">{entry.shortcut}</kbd>}
-          </button>
+          <div key={i} className="menu-row">
+            <button
+              className={"menu-item" + (entry.danger ? " danger" : "")}
+              role={entry.checked === undefined ? "menuitem" : "menuitemradio"}
+              aria-checked={entry.checked}
+              data-index={i}
+              disabled={entry.disabled}
+              onClick={() => {
+                onClose();
+                entry.onSelect();
+              }}
+            >
+              {checkable && <span className="menu-check">{entry.checked && <CheckIcon />}</span>}
+              <span className="menu-label">{entry.label}</span>
+              {entry.shortcut && <kbd className="menu-shortcut">{entry.shortcut}</kbd>}
+            </button>
+            {entry.onRemove && (
+              <button
+                className="menu-remove"
+                tabIndex={-1}
+                title={`Remove ${entry.label}`}
+                aria-label={`Remove ${entry.label}`}
+                onClick={entry.onRemove}
+              >
+                <CloseIcon />
+              </button>
+            )}
+          </div>
         ),
       )}
     </div>

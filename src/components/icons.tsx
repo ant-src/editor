@@ -115,3 +115,5 @@ export const SystemIcon = icon(
     <path d="M5.8 13.6h4.4M8 11.2v2.4" />
   </>,
 );
+export const CheckIcon = icon(<path d="m3.5 8.5 3 3 6-7" />);
+export const RunIcon = icon(<path d="M5 3.3v9.4a.6.6 0 0 0 .9.5l7.4-4.7a.6.6 0 0 0 0-1L5.9 2.8a.6.6 0 0 0-.9.5Z" />);

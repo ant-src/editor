@@ -20,7 +20,7 @@ import {
   ClearIcon,
   CloseIcon,
   MoonIcon,
-  PlayIcon,
+  RunIcon,
   SidebarIcon,
   StopIcon,
   SunIcon,
@@ -51,6 +51,7 @@ import { getTheme, setTheme, subscribe as onTheme, type Theme } from "./theme";
 import AntWorker from "./run/ant.worker?worker";
 import type { WorkerLike } from "./run/protocol";
 import { Runner, type RunnerState, type StepCommand } from "./run/runner";
+import { RunTargets } from "./run/targets";
 
 const output = new ConsoleStore();
 const breakpoints = new BreakpointStore();
@@ -221,14 +222,17 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
   const stop = run.status === "paused" ? run.stop : undefined;
   const frame = picked && picked.stop === stop ? picked.frame : 0;
   const location = stop?.frames[frame];
-  const [lastRun, setLastRun] = useState<string | null>(null);
   const [projectMenu, setProjectMenu] = useState<{ x: number; y: number } | null>(null);
+  const [targetMenu, setTargetMenu] = useState<{ x: number; y: number } | null>(null);
 
-  // What Run runs: the active file when it is an Ant file, else the file that ran last, else main.ant.
-  const entry =
-    (active && isAnt(active) ? active : null) ??
-    (lastRun && project.has(lastRun) ? lastRun : null) ??
-    (project.has("main.ant") ? "main.ant" : null);
+  // What Run runs: the file picked, else the current file when it is an Ant file.
+  const targets = useMemo(
+    () => new RunTargets("ant-editor-run:" + (project.workspace.inBrowser ? "(browser)" : project.workspace.name)),
+    [project],
+  );
+  const picks = useSyncExternalStore(targets.subscribe, targets.getState);
+  const current = active && isAnt(active) ? active : null;
+  const entry = targets.target(current);
   const canStart = runner !== null && run.status === "idle" && entry !== null;
   const running = run.status === "running" || run.status === "paused";
 
@@ -263,6 +267,9 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
       breakpoints.remove(path);
     };
   }, [project]);
+
+  // A file that is gone from the project is no longer one to run.
+  useEffect(() => targets.keep((path) => project.has(path)), [files.tree, targets, project]);
 
   // The first Ant file opens with the folder: main.ant if there is one.
   useEffect(() => {
@@ -316,10 +323,11 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
     return () => opener.dispose();
   }, [project, open]);
 
-  const start = (debug: boolean) => {
-    if (!canStart) return;
-    const program = { files: project.sources(), path: entry };
-    setLastRun(entry);
+  /** start runs or debugs the target, or another file given, which joins the files that can be picked. */
+  const start = (debug: boolean, path = entry) => {
+    if (runner === null || run.status !== "idle" || path === null) return;
+    const program = { files: project.sources(), path };
+    targets.ran(path);
     output.clear();
     if (debug) runner.debug(program, breakpoints.all());
     else runner.run(program);
@@ -345,7 +353,7 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
     const place = (path: string) => moved.get(path) ?? path;
     setTabs((before) => before.map(place));
     setActive((before) => before && place(before));
-    setLastRun((before) => before && place(before));
+    targets.rename(moved);
     for (const [before, after] of moved) breakpoints.move(before, after);
   };
 
@@ -397,6 +405,25 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
     e.preventDefault();
   };
 
+  const targetEntries: MenuEntry[] = [
+    {
+      label: "Current File",
+      checked: picks.selected === null,
+      shortcut: key("mod+shift+Enter"),
+      onSelect: () => targets.select(null),
+    },
+    ...(picks.files.length > 0
+      ? (["separator"] as MenuEntry[]).concat(
+          picks.files.map((path) => ({
+            label: path,
+            checked: picks.selected === path,
+            onSelect: () => targets.select(path),
+            onRemove: () => targets.remove(path),
+          })),
+        )
+      : [{ caption: "Files you run show here" }]),
+  ];
+
   const projectEntries: MenuEntry[] = [
     ...(project.workspace.inBrowser ? [{ caption: "Kept in this browser" }] : []),
     ...(onSaveToFolder ? [{ label: "Save to folder…", onSelect: onSaveToFolder }] : []),
@@ -432,7 +459,8 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
     if (mod && e.key.toLowerCase() === "s") {
       if (e.shiftKey) void project.saveAll();
       else void save(active);
-    } else if (mod && e.key === "Enter") start(false);
+    } else if (mod && e.key === "Enter" && e.shiftKey) start(false, current);
+    else if (mod && e.key === "Enter") start(false);
     else if (mod && e.key.toLowerCase() === "b" && !e.shiftKey) setSidebar((s) => !s);
     else if (mod && e.key.toLowerCase() === "j" && !e.shiftKey) setPanel((p) => ({ ...p, open: !p.open }));
     else if (e.key === "F5" && e.shiftKey) runner?.stop();
@@ -487,37 +515,49 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
         </div>
 
         <div className="toolbar-actions">
-          {!running && (
-            <>
-              <button
-                className="action run"
-                disabled={!canStart}
-                title={entry ? `Run ${entry} (${key("mod+Enter")})` : "Open an Ant file to run"}
-                onClick={() => start(false)}
-              >
-                <PlayIcon />
-                {entry ? `Run ${basename(entry)}` : "Run"}
-                <kbd>{key("mod+Enter")}</kbd>
-              </button>
-              <button
-                className="action"
-                disabled={!canStart}
-                title={entry ? `Debug ${entry} (F5)` : "Open an Ant file to debug"}
-                onClick={() => start(true)}
-              >
-                <BugIcon />
-                Debug
-                <kbd>F5</kbd>
-              </button>
-            </>
-          )}
-          {running && (
-            <button className="action stop" title="Stop the program (⇧F5)" onClick={() => runner?.stop()}>
+          <button
+            className="target-button"
+            aria-haspopup="menu"
+            aria-expanded={targetMenu !== null}
+            title={picks.selected ? `Run and debug ${picks.selected}` : "Run and debug the file open in the editor"}
+            onClick={(e) => {
+              const box = e.currentTarget.getBoundingClientRect();
+              setTargetMenu(targetMenu ? null : { x: box.left, y: box.bottom + 4 });
+            }}
+          >
+            <span className="target-name">{picks.selected ? basename(picks.selected) : "Current File"}</span>
+            <ChevronDownIcon />
+          </button>
+          {/* Stop takes Run's place while a program runs, so that nothing else moves */}
+          {running ? (
+            <button
+              className="icon-button stop"
+              title={`Stop the program (${key("shift+F5")})`}
+              aria-label="Stop"
+              onClick={() => runner?.stop()}
+            >
               <StopIcon />
-              Stop
-              <kbd>{key("shift+F5")}</kbd>
+            </button>
+          ) : (
+            <button
+              className="icon-button run"
+              disabled={!canStart}
+              title={entry ? `Run ${entry} (${key("mod+Enter")})` : "Open an Ant file to run it"}
+              aria-label={entry ? `Run ${entry}` : "Run"}
+              onClick={() => start(false)}
+            >
+              <RunIcon />
             </button>
           )}
+          <button
+            className="icon-button debug"
+            disabled={!canStart}
+            title={entry ? `Debug ${entry} (F5)` : "Open an Ant file to debug it"}
+            aria-label={entry ? `Debug ${entry}` : "Debug"}
+            onClick={() => start(true)}
+          >
+            <BugIcon />
+          </button>
         </div>
 
         <div className="toolbar-end">
@@ -545,6 +585,15 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
           </span>
           <ThemeButton />
         </div>
+        {targetMenu && (
+          <Menu
+            label="Run target"
+            x={targetMenu.x}
+            y={targetMenu.y}
+            entries={targetEntries}
+            onClose={() => setTargetMenu(null)}
+          />
+        )}
         {projectMenu && (
           <Menu
             label={files.name}
@@ -640,6 +689,8 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
                   <dd>Save</dd>
                   <dt>{key("mod+Enter")}</dt>
                   <dd>Run</dd>
+                  <dt>{key("mod+shift+Enter")}</dt>
+                  <dd>Run the current file</dd>
                   <dt>F5</dt>
                   <dd>Debug, continue</dd>
                   <dt>F10 · F11 · {key("shift+F11")}</dt>
