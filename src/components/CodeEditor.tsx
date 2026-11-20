@@ -48,6 +48,7 @@ export function CodeEditor(props: CodeEditorProps) {
       fixedOverflowWidgets: true,
       "semanticHighlighting.enabled": true,
       stickyScroll: { enabled: false },
+      inlayHints: { enabled: "off" },
     });
     editor.current = ed;
 
