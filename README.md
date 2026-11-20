@@ -3,9 +3,14 @@
 Edit, run and debug [Ant](https://ant-lang.org) programs in the browser, with nothing installed:
 [editor.ant-lang.org](https://editor.ant-lang.org).
 
-- **Files.** Work starts in a folder the browser keeps for the page. In Chrome and Edge on a
-  desktop, _Save to folder_ moves it to a folder on disk and _Open folder_ opens one that exists.
-- **Run.** The active file runs in WebAssembly, in a worker. _Stop_ ends it.
+- **Files.** Work starts in a folder the browser keeps for the page. The project's menu downloads
+  it as a .zip in any browser; in Chrome and Edge on a desktop, _Save to folder_ moves it to a
+  folder on disk and _Open folder_ opens one that exists. A right click in the file tree makes,
+  renames and deletes files; a drag moves them.
+- **Run.** The active Ant file runs in WebAssembly, in a worker; with another file open, the one
+  that ran last does, or main.ant. _Stop_ ends it.
+- **Problems.** The checker's errors and warnings list under _Problems_, and a run names them in
+  the console.
 - **Debug.** Click the gutter to set a breakpoint. A paused program shows its line, call stack and
   variables.
 
@@ -17,6 +22,8 @@ Edit, run and debug [Ant](https://ant-lang.org) programs in the browser, with no
 | ⇧F5            | Stop                 |
 | F10, F11, ⇧F11 | Step over, into, out |
 | ⌘B             | Toggle the file tree |
+| ⌘J             | Toggle the panel     |
+| F2, ⌘⌫         | Rename, delete       |
 
 ## Development
 
