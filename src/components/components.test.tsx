@@ -4,6 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import type { Scope, Stop, Variable } from "../run/runner";
 import { Console } from "./Console";
 import { FileTree } from "./FileTree";
+import { Menu } from "./Menu";
 import { Variables } from "./Variables";
 
 afterEach(cleanup);
@@ -235,4 +236,22 @@ test("while the program runs the panel says so, after a moment", async () => {
   act(() => void vi.advanceTimersByTime(250));
   expect(screen.getByText("Running…")).toBeTruthy();
   vi.useRealTimers();
+});
+
+test("a menu item comes off by its button or Delete, and the menu stays open with the focus in it", async () => {
+  const onClose = vi.fn();
+  const removed: string[] = [];
+  const entries = (names: string[]) =>
+    names.map((name) => ({ label: name, checked: false, onSelect: vi.fn(), onRemove: () => removed.push(name) }));
+  const { rerender } = render(<Menu label="Run" x={0} y={0} entries={entries(["a", "b", "c"])} onClose={onClose} />);
+  expect(screen.getAllByRole("menuitemradio").map((b) => b.textContent)).toEqual(["a", "b", "c"]);
+  fireEvent.click(screen.getByTitle("Remove a"));
+  rerender(<Menu label="Run" x={0} y={0} entries={entries(["b", "c"])} onClose={onClose} />);
+  const c = screen.getByText("c").closest("button")!;
+  c.focus();
+  fireEvent.keyDown(c, { key: "Delete" });
+  expect(removed).toEqual(["a", "c"]);
+  expect(onClose).not.toHaveBeenCalled();
+  rerender(<Menu label="Run" x={0} y={0} entries={entries(["b"])} onClose={onClose} />);
+  await waitFor(() => expect(document.activeElement?.textContent).toBe("b"));
 });

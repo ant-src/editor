@@ -51,7 +51,7 @@ import { getTheme, setTheme, subscribe as onTheme, type Theme } from "./theme";
 import AntWorker from "./run/ant.worker?worker";
 import type { WorkerLike } from "./run/protocol";
 import { Runner, type RunnerState, type StepCommand } from "./run/runner";
-import { RunTargets } from "./run/targets";
+import { moveTargets, RunTargets, targetsKey } from "./run/targets";
 
 const output = new ConsoleStore();
 const breakpoints = new BreakpointStore();
@@ -144,6 +144,7 @@ export function App() {
       if (replaced.length > 0 && !window.confirm(`${target.name} already has ${list(replaced)}. Replace?`)) return;
       runner?.stop();
       await from.workspace.copyTo(target);
+      moveTargets(targetsKey(from.workspace), targetsKey(target)); // the files to run come along
       await show(target, true);
       await from.workspace.clear(); // the next start is a new workspace
       output.write("info", `Saved to the folder ${target.name}\n`);
@@ -226,10 +227,7 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
   const [targetMenu, setTargetMenu] = useState<{ x: number; y: number } | null>(null);
 
   // What Run runs: the file picked, else the current file when it is an Ant file.
-  const targets = useMemo(
-    () => new RunTargets("ant-editor-run:" + (project.workspace.inBrowser ? "(browser)" : project.workspace.name)),
-    [project],
-  );
+  const targets = useMemo(() => new RunTargets(targetsKey(project.workspace)), [project]);
   const picks = useSyncExternalStore(targets.subscribe, targets.getState);
   const current = active && isAnt(active) ? active : null;
   const entry = targets.target(current);
@@ -268,8 +266,12 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
     };
   }, [project]);
 
-  // A file that is gone from the project is no longer one to run.
-  useEffect(() => targets.keep((path) => project.has(path)), [files.tree, targets, project]);
+  // A file that is not in the tree is not one to run, but stays on the list in case it comes back.
+  // Where the tree is cut short, a file it leaves out may well be there.
+  useEffect(() => {
+    const paths = new Set(workspaceFiles(files.tree));
+    targets.showOnly((path) => files.truncated || paths.has(path));
+  }, [files.tree, files.truncated, targets]);
 
   // The first Ant file opens with the folder: main.ant if there is one.
   useEffect(() => {

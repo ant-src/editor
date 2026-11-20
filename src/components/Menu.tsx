@@ -69,6 +69,17 @@ export function Menu({ entries, x, y, label, onClose }: MenuProps) {
   // Items of a set of choices leave room for the check mark, all of them alike.
   const checkable = entries.some((e) => typeof e === "object" && "onSelect" in e && e.checked !== undefined);
 
+  /** remove takes an item off, and the item in its place takes the focus once the menu shows the shorter list. */
+  const remove = (entry: { onRemove?(): void }, index: number) => {
+    if (!entry.onRemove) return;
+    const at = items(menu.current!).findIndex((item) => item.dataset.index === String(index));
+    entry.onRemove();
+    requestAnimationFrame(() => {
+      const now = menu.current ? items(menu.current) : [];
+      now[Math.min(Math.max(at, 0), now.length - 1)]?.focus();
+    });
+  };
+
   const onKeyDown = (e: KeyboardEvent) => {
     const all = items(menu.current!);
     const i = all.indexOf(document.activeElement as HTMLButtonElement);
@@ -79,14 +90,10 @@ export function Menu({ entries, x, y, label, onClose }: MenuProps) {
     else if (e.key === "End") go(all.length - 1);
     else if (e.key === "Escape" || e.key === "Tab") onClose();
     else if ((e.key === "Delete" || e.key === "Backspace") && i >= 0) {
-      const entry = entries[Number(all[i].dataset.index)];
+      const index = Number(all[i].dataset.index);
+      const entry = entries[index];
       if (typeof entry !== "object" || !("onSelect" in entry) || !entry.onRemove) return;
-      entry.onRemove();
-      // the item in its place takes the focus, once the menu shows the shorter list
-      requestAnimationFrame(() => {
-        const now = menu.current ? items(menu.current) : [];
-        now[Math.min(i, now.length - 1)]?.focus();
-      });
+      remove(entry, index);
     } else return;
     e.preventDefault();
     e.stopPropagation();
@@ -110,11 +117,12 @@ export function Menu({ entries, x, y, label, onClose }: MenuProps) {
             {entry.caption}
           </div>
         ) : (
-          <div key={i} className="menu-row">
+          <div key={i} className="menu-row" role="none">
             <button
               className={"menu-item" + (entry.danger ? " danger" : "")}
               role={entry.checked === undefined ? "menuitem" : "menuitemradio"}
               aria-checked={entry.checked}
+              aria-keyshortcuts={entry.onRemove ? "Delete" : undefined}
               data-index={i}
               disabled={entry.disabled}
               onClick={() => {
@@ -127,12 +135,14 @@ export function Menu({ entries, x, y, label, onClose }: MenuProps) {
               {entry.shortcut && <kbd className="menu-shortcut">{entry.shortcut}</kbd>}
             </button>
             {entry.onRemove && (
+              // for the mouse; the keys reach the same through Delete on the item
               <button
                 className="menu-remove"
                 tabIndex={-1}
+                aria-hidden="true"
                 title={`Remove ${entry.label}`}
-                aria-label={`Remove ${entry.label}`}
-                onClick={entry.onRemove}
+                onPointerDown={(e) => e.preventDefault()} // the focus stays in the menu
+                onClick={() => remove(entry, i)}
               >
                 <CloseIcon />
               </button>
