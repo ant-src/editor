@@ -526,6 +526,7 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
               <Count problems={problemList} />
             </button>
           )}
+          {/* only what shows nowhere else: Stop, the console and the debugger say a program runs */}
           <span className={"status " + run.status} role="status">
             {failure
               ? `Ant did not load: ${failure}`
@@ -533,11 +534,7 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
                 ? `Ant did not load: ${run.error}`
                 : run.status === "starting"
                   ? "Loading Ant…"
-                  : run.status === "running"
-                    ? run.debugging
-                      ? "Debugging…"
-                      : "Running…"
-                    : ""}
+                  : ""}
           </span>
           <div className="toolbar-actions">
             <button
