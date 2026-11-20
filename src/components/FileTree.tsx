@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { basename, dirname, type TreeNode } from "../fs/workspace";
 import { key, mac } from "../keys";
-import { ChevronIcon, FileIcon, FolderIcon, NewFileIcon, NewFolderIcon, RefreshIcon } from "./icons";
+import { ChevronIcon, FileIcon, FolderIcon, NewFileIcon, NewFolderIcon } from "./icons";
 import { Menu, type MenuEntry } from "./Menu";
 
 export interface FileTreeProps {
@@ -20,7 +20,6 @@ export interface FileTreeProps {
   onRename(from: string, to: string): Promise<void>;
   /** Deletes a file or a directory, once the user agrees to. */
   onDelete(node: TreeNode): void;
-  onRefresh(): void;
 }
 
 interface Draft {
@@ -34,7 +33,7 @@ interface Draft {
 const dragType = "application/x-ant-path";
 
 export function FileTree(props: FileTreeProps) {
-  const { tree, truncated, active, dirty, onOpen, onCreate, onRename, onDelete, onRefresh } = props;
+  const { tree, truncated, active, dirty, onOpen, onCreate, onRename, onDelete } = props;
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [focus, setFocus] = useState(""); // the directory new entries go to
   const [cursor, setCursor] = useState<string | null>(null); // the row the keys act on
@@ -288,9 +287,6 @@ export function FileTree(props: FileTreeProps) {
           onClick={() => create("directory")}
         >
           <NewFolderIcon />
-        </button>
-        <button className="icon-button" title="Reload the folder from disk" aria-label="Refresh" onClick={onRefresh}>
-          <RefreshIcon />
         </button>
       </header>
       <ul

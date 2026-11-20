@@ -30,7 +30,6 @@ test("the file tree folds directories, opens files and marks unsaved ones", () =
       onCreate={vi.fn()}
       onRename={vi.fn()}
       onDelete={vi.fn()}
-      onRefresh={vi.fn()}
     />,
   );
   expect(screen.queryByText("util.ant")).toBeNull();
@@ -53,7 +52,6 @@ test("a new file goes to the directory last clicked, and an error shows under it
       onCreate={onCreate}
       onRename={vi.fn()}
       onDelete={vi.fn()}
-      onRefresh={vi.fn()}
     />,
   );
   fireEvent.click(screen.getByText("lib"));
@@ -83,7 +81,6 @@ test("a row renames from its menu or F2, and deletes from its menu or Delete", a
       onCreate={vi.fn()}
       onRename={onRename}
       onDelete={onDelete}
-      onRefresh={vi.fn()}
     />,
   );
   fireEvent.contextMenu(screen.getByText("main.ant"));
@@ -117,7 +114,6 @@ test("the arrow keys move between rows and fold directories", () => {
       onCreate={vi.fn()}
       onRename={vi.fn()}
       onDelete={vi.fn()}
-      onRefresh={vi.fn()}
     />,
   );
   const lib = screen.getByText("lib").closest("button")!;
@@ -143,7 +139,6 @@ test("a row dragged onto a directory moves into it", async () => {
       onCreate={vi.fn()}
       onRename={onRename}
       onDelete={vi.fn()}
-      onRefresh={vi.fn()}
     />,
   );
   const data = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };

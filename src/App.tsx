@@ -620,7 +620,6 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
                 }}
                 onRename={rename}
                 onDelete={remove}
-                onRefresh={() => void project.refresh()}
               />
             </div>
             <Resizer
