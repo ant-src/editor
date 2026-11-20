@@ -27,6 +27,7 @@ import {
   files as workspaceFiles,
   pickFolder,
   supported,
+  type TreeNode,
   type Workspace,
 } from "./fs/workspace";
 import logo from "./logo.svg";
@@ -286,6 +287,27 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
   const save = (path: string | null) =>
     path && project.save(path).catch((err) => output.write("stderr", `${path}: ${(err as Error).message}\n`));
 
+  /** rename moves a file or a directory, and its tabs and breakpoints with it. */
+  const rename = async (from: string, to: string) => {
+    let moved: Map<string, string>;
+    try {
+      moved = await project.rename(from, to);
+    } catch (err) {
+      output.write("stderr", `Renaming ${from}: ${(err as Error).message}\n`);
+      throw err;
+    }
+    const place = (path: string) => moved.get(path) ?? path;
+    setTabs((before) => before.map(place));
+    setActive((before) => before && place(before));
+    for (const [before, after] of moved) breakpoints.move(before, after);
+  };
+
+  const remove = (node: TreeNode) => {
+    const what = node.kind === "directory" ? `the folder ${node.path} and everything in it` : node.path;
+    if (!window.confirm(`Delete ${what}?`)) return;
+    project.remove(node.path).catch((err) => output.write("stderr", `Deleting ${node.path}: ${err?.message ?? err}\n`));
+  };
+
   const sendBreakpoints = (path: string) => {
     if (run.debugging) runner?.setBreakpoints(path, [...breakpoints.lines(path)]).catch(() => {});
   };
@@ -460,7 +482,6 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
           <>
             <div className="sidebar" style={{ width: sidebarWidth }}>
               <FileTree
-                name={files.name}
                 tree={files.tree}
                 truncated={files.truncated}
                 active={active}
@@ -471,6 +492,8 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
                   await project.createFile(path);
                   await open(path);
                 }}
+                onRename={rename}
+                onDelete={remove}
                 onRefresh={() => void project.refresh()}
               />
             </div>

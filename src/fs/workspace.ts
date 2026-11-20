@@ -145,6 +145,54 @@ export class Workspace {
     await this.directory(split(path), true);
   }
 
+  /** kind says whether path is a file or a directory of the folder, or undefined when it is neither. */
+  async kind(path: string): Promise<"file" | "directory" | undefined> {
+    const names = split(path);
+    const name = names.pop()!;
+    try {
+      const dir = await this.directory(names, false);
+      try {
+        await dir.getFileHandle(name);
+        return "file";
+      } catch (err) {
+        if (!isTypeMismatch(err)) throw err;
+        return "directory";
+      }
+    } catch (err) {
+      if (isNotFound(err) || isTypeMismatch(err)) return undefined;
+      throw err;
+    }
+  }
+
+  /**
+   * rename moves the file or directory at from to the path to, making the directories on the way.
+   * It refuses a path that exists, and a directory moved into itself.
+   */
+  async rename(from: string, to: string): Promise<void> {
+    split(to);
+    if (from === to) return;
+    if (to.startsWith(from + "/")) throw new Error(`${from} cannot move into itself`);
+    const kind = await this.kind(from);
+    if (!kind) throw new Error(`${from} does not exist`);
+    if (await this.exists(to)) throw new Error(`${to} already exists`);
+    const copy = async (from: string, to: string, kind: "file" | "directory") => {
+      if (kind === "file") return this.write(to, await this.file(from));
+      await this.directory(split(to), true);
+      for await (const [name, handle] of (await this.directory(split(from), false)).entries()) {
+        await copy(from + "/" + name, to + "/" + name, handle.kind);
+      }
+    };
+    await copy(from, to, kind);
+    await this.remove(from);
+  }
+
+  /** remove deletes the file or the directory, with everything in it, at path. */
+  async remove(path: string): Promise<void> {
+    const names = split(path);
+    const name = names.pop()!;
+    await (await this.directory(names, false)).removeEntry(name, { recursive: true });
+  }
+
   async exists(path: string): Promise<boolean> {
     const names = split(path);
     const name = names.pop()!;

@@ -121,3 +121,51 @@ test("refresh takes changes made on disk, and keeps the buffers with changes of 
   await project.refresh();
   expect(project.getState().dirty.size).toBe(0);
 });
+
+test("rename carries the buffers along, unsaved changes and all", async () => {
+  const { dir, project } = await open({ "main.ant": "m", "lib/util.ant": "u", "lib/x.ant": "x" });
+  project.buffer("lib/util.ant")!.setValue("changed");
+  const removed: string[] = [];
+  project.onRemoved = (path) => removed.push(path);
+  const moved = await project.rename("lib", "src");
+  expect([...moved]).toEqual([
+    ["lib/util.ant", "src/util.ant"],
+    ["lib/x.ant", "src/x.ant"],
+  ]);
+  expect(removed).toEqual([]);
+  expect(project.has("lib/util.ant")).toBe(false);
+  expect(project.buffer("src/util.ant")!.getValue()).toBe("changed");
+  expect(project.isDirty("src/util.ant")).toBe(true);
+  expect(project.isDirty("src/x.ant")).toBe(false);
+  expect([...project.getState().dirty]).toEqual(["src/util.ant"]);
+  expect(dir.at("src/util.ant").text).toBe("u");
+  await project.save("src/util.ant");
+  expect(dir.at("src/util.ant").text).toBe("changed");
+});
+
+test("remove drops the buffers of what it deletes, and says so", async () => {
+  const { dir, project, buffers } = await open({ "main.ant": "m", "lib/util.ant": "u" });
+  project.buffer("lib/util.ant")!.setValue("changed");
+  const removed: string[] = [];
+  project.onRemoved = (path) => removed.push(path);
+  await project.remove("lib");
+  expect(removed).toEqual(["lib/util.ant"]);
+  expect(buffers.get("lib/util.ant")!.disposed).toBe(true);
+  expect(project.getState().dirty.size).toBe(0);
+  expect(project.getState().tree.map((n) => n.path)).toEqual(["main.ant"]);
+  expect(dir.dump()).toEqual({ "main.ant": "m" });
+});
+
+test("a snapshot has the unsaved changes and the empty directories", async () => {
+  const { project } = await open({ "main.ant": "m", "notes.md": "n", "assets/": "" });
+  project.buffer("main.ant")!.setValue("changed");
+  const files = await project.snapshot();
+  const texts = await Promise.all(
+    files.map(async (f) => [f.path, typeof f.data === "string" ? f.data : await f.data.text()]),
+  );
+  expect(texts).toEqual([
+    ["assets/", ""],
+    ["main.ant", "changed"],
+    ["notes.md", "n"],
+  ]);
+});

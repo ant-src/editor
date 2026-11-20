@@ -65,6 +65,14 @@ export class BreakpointStore {
     if (Object.keys(this.state.unverified).length > 0) this.update({ ...this.state, unverified: {} });
   }
 
+  /** move gives the breakpoints of a module that moved to its new path. */
+  move(from: string, to: string) {
+    const lines = this.lines(from);
+    if (lines.length === 0) return;
+    this.set(to, lines);
+    this.remove(from);
+  }
+
   /** remove drops the breakpoints of a module that is gone. */
   remove(path: string) {
     this.set(path, []);

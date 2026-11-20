@@ -22,12 +22,13 @@ test("the file tree folds directories, opens files and marks unsaved ones", () =
   const onOpen = vi.fn();
   render(
     <FileTree
-      name="demo"
       tree={tree}
       active="main.ant"
       dirty={new Set(["main.ant"])}
       onOpen={onOpen}
       onCreate={vi.fn()}
+      onRename={vi.fn()}
+      onDelete={vi.fn()}
       onRefresh={vi.fn()}
     />,
   );
@@ -44,12 +45,13 @@ test("a new file goes to the directory last clicked, and an error shows under it
   const onCreate = vi.fn().mockRejectedValueOnce(new Error("lib/util.ant already exists")).mockResolvedValue(undefined);
   render(
     <FileTree
-      name="demo"
       tree={tree}
       active={null}
       dirty={new Set()}
       onOpen={vi.fn()}
       onCreate={onCreate}
+      onRename={vi.fn()}
+      onDelete={vi.fn()}
       onRefresh={vi.fn()}
     />,
   );
@@ -66,6 +68,88 @@ test("a new file goes to the directory last clicked, and an error shows under it
     ["file", "lib/util.ant"],
     ["file", "lib/new.ant"],
   ]);
+});
+
+test("a row renames from its menu or F2, and deletes from its menu or Delete", async () => {
+  const onRename = vi.fn().mockResolvedValue(undefined);
+  const onDelete = vi.fn();
+  render(
+    <FileTree
+      tree={tree}
+      active="main.ant"
+      dirty={new Set()}
+      onOpen={vi.fn()}
+      onCreate={vi.fn()}
+      onRename={onRename}
+      onDelete={onDelete}
+      onRefresh={vi.fn()}
+    />,
+  );
+  fireEvent.contextMenu(screen.getByText("main.ant"));
+  fireEvent.click(screen.getByRole("menuitem", { name: /Rename/ }));
+  const input = screen.getByLabelText("New name") as HTMLInputElement;
+  expect([input.value, input.selectionStart, input.selectionEnd]).toEqual(["main.ant", 0, 4]);
+  fireEvent.change(input, { target: { value: "app.ant" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  await waitFor(() => expect(screen.queryByLabelText("New name")).toBeNull());
+  expect(onRename).toHaveBeenCalledWith("main.ant", "app.ant");
+
+  fireEvent.keyDown(screen.getByText("lib"), { key: "F2" });
+  fireEvent.change(screen.getByLabelText("New name"), { target: { value: "src" } });
+  fireEvent.keyDown(screen.getByLabelText("New name"), { key: "Enter" });
+  await waitFor(() => expect(onRename).toHaveBeenCalledWith("lib", "src"));
+
+  fireEvent.keyDown(screen.getByText("lib"), { key: "Delete" });
+  expect(onDelete).toHaveBeenCalledWith(tree[0]);
+  fireEvent.contextMenu(screen.getByText("main.ant"));
+  fireEvent.click(screen.getByRole("menuitem", { name: /Delete/ }));
+  expect(onDelete).toHaveBeenLastCalledWith(tree[1]);
+});
+
+test("the arrow keys move between rows and fold directories", () => {
+  render(
+    <FileTree
+      tree={tree}
+      active={null}
+      dirty={new Set()}
+      onOpen={vi.fn()}
+      onCreate={vi.fn()}
+      onRename={vi.fn()}
+      onDelete={vi.fn()}
+      onRefresh={vi.fn()}
+    />,
+  );
+  const lib = screen.getByText("lib").closest("button")!;
+  lib.focus();
+  fireEvent.keyDown(lib, { key: "ArrowRight" });
+  expect(screen.getByText("util.ant")).toBeTruthy();
+  fireEvent.keyDown(lib, { key: "ArrowDown" });
+  expect(document.activeElement).toBe(screen.getByText("util.ant").closest("button"));
+  fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
+  expect(document.activeElement).toBe(lib);
+  fireEvent.keyDown(lib, { key: "ArrowLeft" });
+  expect(screen.queryByText("util.ant")).toBeNull();
+});
+
+test("a row dragged onto a directory moves into it", async () => {
+  const onRename = vi.fn().mockResolvedValue(undefined);
+  render(
+    <FileTree
+      tree={tree}
+      active={null}
+      dirty={new Set()}
+      onOpen={vi.fn()}
+      onCreate={vi.fn()}
+      onRename={onRename}
+      onDelete={vi.fn()}
+      onRefresh={vi.fn()}
+    />,
+  );
+  const data = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
+  fireEvent.dragStart(screen.getByText("main.ant"), { dataTransfer: data });
+  fireEvent.dragOver(screen.getByText("lib"), { dataTransfer: data });
+  fireEvent.drop(screen.getByText("lib"), { dataTransfer: data });
+  expect(onRename).toHaveBeenCalledWith("main.ant", "lib/main.ant");
 });
 
 test("the console links the positions of the project's files", () => {

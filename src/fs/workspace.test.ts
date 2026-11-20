@@ -99,3 +99,31 @@ test("a workspace in the browser has the name it is given", () => {
   const workspace = new Workspace(handle(dir), true, "Untitled");
   expect([workspace.name, workspace.inBrowser]).toEqual(["Untitled", true]);
 });
+
+test("rename moves a file or a directory with everything in it, and refuses what exists", async () => {
+  const { dir, workspace } = open({ "main.ant": "m", "lib/util.ant": "u", "lib/deep/x.ant": "x", "lib/empty/": "" });
+  await workspace.rename("main.ant", "app/main.ant");
+  expect(dir.dump()).toEqual({ "app/main.ant": "m", "lib/util.ant": "u", "lib/deep/x.ant": "x", "lib/empty/": "" });
+  await workspace.rename("lib", "src/lib");
+  expect(dir.dump()).toEqual({
+    "app/main.ant": "m",
+    "src/lib/util.ant": "u",
+    "src/lib/deep/x.ant": "x",
+    "src/lib/empty/": "",
+  });
+  await expect(workspace.rename("src/lib", "app/main.ant")).rejects.toThrow("app/main.ant already exists");
+  await expect(workspace.rename("src", "src/inner")).rejects.toThrow("src cannot move into itself");
+  await expect(workspace.rename("none.ant", "x.ant")).rejects.toThrow("none.ant does not exist");
+  await expect(workspace.rename("app/main.ant", "../x.ant")).rejects.toThrow();
+  expect(await workspace.kind("src/lib")).toBe("directory");
+  expect(await workspace.kind("app/main.ant")).toBe("file");
+  expect(await workspace.kind("app/none")).toBeUndefined();
+});
+
+test("remove deletes a file, or a directory and what is in it", async () => {
+  const { dir, workspace } = open({ "main.ant": "m", "lib/util.ant": "u", "lib/deep/x.ant": "x" });
+  await workspace.remove("lib");
+  await workspace.remove("main.ant");
+  expect(dir.dump()).toEqual({});
+  await expect(workspace.remove("main.ant")).rejects.toThrow();
+});

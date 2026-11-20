@@ -66,8 +66,16 @@ export class Project {
    * every buffer whose file changed on disk, unless the buffer has changes of its own.
    */
   refresh(): Promise<void> {
-    const run = this.refreshing.then(() => this.sync());
-    this.refreshing = run.catch(() => {});
+    return this.serial(() => this.sync());
+  }
+
+  /** serial runs work after the reading or changing of the folder under way, one at a time. */
+  private serial<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.refreshing.then(work);
+    this.refreshing = run.then(
+      () => {},
+      () => {},
+    );
     return run;
   }
 
@@ -91,11 +99,9 @@ export class Project {
         // a file that cannot be read stays out of the buffers, or keeps the buffer it has
       }
     }
-    for (const [path, doc] of this.docs) {
+    for (const path of this.docs.keys()) {
       if (!onDisk.has(path) && !this.isDirty(path)) {
-        doc.subscription.dispose();
-        doc.buffer.dispose();
-        this.docs.delete(path);
+        this.drop(path);
         this.onRemoved(path);
       }
     }
@@ -114,6 +120,18 @@ export class Project {
     };
     this.docs.set(path, doc);
     return doc;
+  }
+
+  private drop(path: string) {
+    const doc = this.docs.get(path)!;
+    doc.subscription.dispose();
+    doc.buffer.dispose();
+    this.docs.delete(path);
+  }
+
+  /** under lists the paths of the buffers of the file at path, or of the files in the directory there. */
+  private under(path: string): string[] {
+    return [...this.docs.keys()].filter((p) => p === path || p.startsWith(path + "/"));
   }
 
   private dirtySet(): Set<string> {
@@ -166,6 +184,64 @@ export class Project {
   async createDirectory(path: string): Promise<void> {
     await this.workspace.createDirectory(path);
     await this.refresh();
+  }
+
+  /**
+   * rename moves a file or a directory, and the buffers of the files that move with it, unsaved
+   * changes and all. It returns the new path of each buffer by its old one.
+   */
+  rename(from: string, to: string): Promise<Map<string, string>> {
+    return this.serial(async () => {
+      const moved = new Map<string, string>();
+      const carried: { path: string; text: string; dirty: boolean }[] = [];
+      await this.workspace.rename(from, to);
+      for (const path of this.under(from)) {
+        const next = to + path.slice(from.length);
+        moved.set(path, next);
+        carried.push({ path: next, text: this.docs.get(path)!.buffer.getValue(), dirty: this.isDirty(path) });
+        this.drop(path);
+      }
+      for (const { path, text, dirty } of carried) {
+        const file = await this.workspace.file(path);
+        const doc = this.docs.get(path) ?? this.add(path, await file.text(), file.lastModified);
+        if (dirty) doc.buffer.setValue(text);
+      }
+      await this.sync();
+      return moved;
+    });
+  }
+
+  /** remove deletes a file or a directory, and drops the buffers of the files that go with it. */
+  remove(path: string): Promise<void> {
+    return this.serial(async () => {
+      await this.workspace.remove(path);
+      for (const p of this.under(path)) {
+        this.drop(p);
+        this.onRemoved(p);
+      }
+      await this.sync();
+    });
+  }
+
+  /**
+   * snapshot lists every file of the folder as the editor shows it, with the changes not yet
+   * saved, and the directories that are empty, as paths that end in "/".
+   */
+  async snapshot(): Promise<{ path: string; data: Blob | string }[]> {
+    const out: { path: string; data: Blob | string }[] = [];
+    const walk = async (nodes: TreeNode[]) => {
+      for (const node of nodes) {
+        if (node.kind === "directory") {
+          if ((node.children ?? []).length === 0) out.push({ path: node.path + "/", data: "" });
+          await walk(node.children ?? []);
+        } else {
+          const doc = this.docs.get(node.path);
+          out.push({ path: node.path, data: doc ? doc.buffer.getValue() : await this.workspace.file(node.path) });
+        }
+      }
+    };
+    await walk((await this.workspace.tree()).nodes);
+    return out;
   }
 
   /** sources are the program's modules as the editor shows them: every Ant buffer, by path. */
