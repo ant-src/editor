@@ -17,6 +17,7 @@ test("the tree lists directories first, by name, and leaves out .git and node_mo
     ".git/HEAD": "",
     "node_modules/pkg/index.js": "",
     ".gitignore": "",
+    "main.ant.1.crswap": "",
   });
   const { nodes, truncated } = await workspace.tree();
   expect(truncated).toBe(false);

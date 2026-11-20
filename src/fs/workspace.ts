@@ -48,7 +48,7 @@ export class Workspace {
     const list = async (dir: FileSystemDirectoryHandle, prefix: string): Promise<TreeNode[]> => {
       const nodes: TreeNode[] = [];
       for await (const [name, handle] of dir.entries()) {
-        if (ignored.has(name)) continue;
+        if (ignored.has(name) || name.endsWith(".crswap")) continue; // Chrome's file of a write under way
         if (left-- <= 0) break;
         const path = prefix + name;
         if (handle.kind === "directory") {
