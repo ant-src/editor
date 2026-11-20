@@ -84,7 +84,7 @@ export function App() {
     if (current.current) return;
     browserWorkspace().then(
       (workspace) => void (!current.current && show(workspace)),
-      () => setError("This browser keeps no files for the page."),
+      (err) => setError(String(err?.message ?? err)),
     );
   }, [show]);
 
@@ -122,7 +122,7 @@ export function App() {
   }, [runner, show]);
 
   if (!project) {
-    return <Welcome onOpen={openFolder} error={error} loading={error === ""} />;
+    return <Welcome error={error} />;
   }
   return (
     <Ide
@@ -140,33 +140,18 @@ function list(paths: string[]): string {
   return paths.length <= 3 ? paths.join(", ") : `${paths.slice(0, 3).join(", ")} and ${paths.length - 3} more`;
 }
 
-/** Welcome shows while the workspace opens, and when the browser has none to open. */
-function Welcome({ onOpen, error, loading }: { onOpen(): void; error: string; loading: boolean }) {
+/** Welcome shows while the workspace opens, and why it did not. */
+function Welcome({ error }: { error: string }) {
   return (
     <main className="welcome">
       <img src={logo} alt="" width="56" height="56" />
       <h1>Ant Editor</h1>
-      {loading ? (
-        <p>Opening…</p>
+      {error ? (
+        <p className="welcome-note" role="alert">
+          {error}
+        </p>
       ) : (
-        <>
-          <p>Edit, run and debug Ant programs in a folder on your computer. Nothing leaves the browser.</p>
-          {supported() ? (
-            <button className="primary" onClick={onOpen}>
-              <FolderIcon />
-              Open folder
-            </button>
-          ) : (
-            <p className="welcome-note" role="alert">
-              This browser cannot open local folders. Use Chrome or Edge on a desktop.
-            </p>
-          )}
-          {error && (
-            <p className="welcome-note" role="alert">
-              {error}
-            </p>
-          )}
-        </>
+        <p>Opening…</p>
       )}
     </main>
   );

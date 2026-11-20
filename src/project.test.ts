@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { Workspace } from "./fs/workspace";
 import { Project, type TextBuffer } from "./project";
-import { folder, handle } from "./test/memory-fs";
+import { folder, handle } from "./fs/memory";
 
 // A buffer as Monaco's model behaves: a version for each content, which undo returns to.
 class Buffer implements TextBuffer {

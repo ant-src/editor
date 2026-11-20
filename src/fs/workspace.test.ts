@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { folder, handle } from "../test/memory-fs";
+import { folder, handle } from "./memory";
 import { files, maxEntries, split, Workspace } from "./workspace";
 
 function open(tree: Record<string, string>) {

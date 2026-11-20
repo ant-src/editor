@@ -1,10 +1,10 @@
 # Ant Editor
 
 Edit, run and debug [Ant](https://ant-lang.org) programs in the browser, with nothing installed:
-[editor.ant-lang.org](https://editor.ant-lang.org). It targets desktop Chrome.
+[editor.ant-lang.org](https://editor.ant-lang.org).
 
-- **Files.** Work starts in a folder the browser keeps for the page. _Save to folder_ moves it to a
-  folder on disk; _Open folder_ opens one that exists.
+- **Files.** Work starts in a folder the browser keeps for the page. In Chrome and Edge on a
+  desktop, _Save to folder_ moves it to a folder on disk and _Open folder_ opens one that exists.
 - **Run.** The active file runs in WebAssembly, in a worker. _Stop_ ends it.
 - **Debug.** Click the gutter to set a breakpoint. A paused program shows its line, call stack and
   variables.

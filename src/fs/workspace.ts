@@ -2,6 +2,7 @@
 // and reading, writing and creating the files in it. It is a folder on disk the user opened, or
 // the folder the browser keeps for the page, where work starts before there is one on disk.
 // Paths are slash-separated and relative to the folder, such as "main.ant" or "lib/util.ant".
+import { handle, stored } from "./memory";
 
 export interface TreeNode {
   name: string;
@@ -250,13 +251,21 @@ for name in ["world", "ant"] {
 
 /**
  * browserWorkspace opens the folder the browser keeps for the page, which outlives the page, and
- * puts the starter program there when it is empty. It throws where the browser keeps none.
+ * puts the starter program there when it is empty. It is in the origin private file system, or,
+ * where a page cannot write there (Safari before 26, a private window), in localStorage.
  */
 export async function browserWorkspace(): Promise<Workspace> {
-  const root = await navigator.storage.getDirectory();
-  const workspace = new Workspace(await root.getDirectoryHandle("workspace", { create: true }), true, "Untitled");
-  if ((await workspace.tree()).nodes.length === 0) {
-    await workspace.write("main.ant", starter);
+  const start = async (root: FileSystemDirectoryHandle) => {
+    const workspace = new Workspace(root, true, "Untitled");
+    if ((await workspace.tree()).nodes.length === 0) await workspace.write("main.ant", starter);
+    return workspace;
+  };
+  try {
+    if (typeof FileSystemFileHandle.prototype.createWritable !== "function") throw new Error("no createWritable");
+    return await start(
+      await (await navigator.storage.getDirectory()).getDirectoryHandle("workspace", { create: true }),
+    );
+  } catch {
+    return start(handle(stored("ant-editor-workspace")));
   }
-  return workspace;
 }
