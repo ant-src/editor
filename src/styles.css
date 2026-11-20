@@ -193,6 +193,7 @@ svg.icon {
 }
 
 .project-button {
+  flex: none;
   min-width: 0;
   display: inline-flex;
   align-items: center;
@@ -213,6 +214,7 @@ svg.icon {
 }
 
 .project-name {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -220,7 +222,10 @@ svg.icon {
 }
 
 .browser-only {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   height: 22px;
   padding: 0 8px;
   border: 1px solid color-mix(in srgb, var(--paused) 45%, transparent);
@@ -279,6 +284,12 @@ svg.icon {
   margin-left: 2px;
   font: 11px var(--sans);
   color: var(--fg-faint);
+}
+
+@media (max-width: 1000px) {
+  .action kbd {
+    display: none;
+  }
 }
 
 .action.run .icon {
