@@ -162,11 +162,10 @@ test("the console links the positions of the project's files", () => {
       ]}
       isFile={(path) => path === "lib/util.ant"}
       onOpen={onOpen}
-      onClear={vi.fn()}
     />,
   );
   expect(screen.getByRole("log").textContent).toContain("hello\npanic: boom");
-  expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["", "lib/util.ant:3:7"]);
+  expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["lib/util.ant:3:7"]);
   fireEvent.click(screen.getByText("lib/util.ant:3:7"));
   expect(onOpen).toHaveBeenCalledWith("lib/util.ant", 3, 7);
 });

@@ -2,19 +2,17 @@
 // lib/util.ant:3:5 in a panic's trace, is a link to it.
 import { memo, useLayoutEffect, useRef, type ReactNode } from "react";
 import type { Segment } from "../console";
-import { ClearIcon } from "./icons";
 
 export interface ConsoleProps {
   segments: readonly Segment[];
   /** Says whether a path names a file that can be opened. */
   isFile(path: string): boolean;
   onOpen(path: string, line: number, column: number): void;
-  onClear(): void;
 }
 
 const position = /((?:[\w.@-]+\/)*[\w.@-]+\.ant):(\d+)(?::(\d+))?/g;
 
-export function Console({ segments, isFile, onOpen, onClear }: ConsoleProps) {
+export function Console({ segments, isFile, onOpen }: ConsoleProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const pinned = useRef(true); // the view follows the output while it is at the end
 
@@ -24,33 +22,26 @@ export function Console({ segments, isFile, onOpen, onClear }: ConsoleProps) {
   }, [segments]);
 
   return (
-    <section className="console" aria-label="Console">
-      <header className="panel-header">
-        <span className="panel-title">Console</span>
-        <button className="icon-button" title="Clear the console" aria-label="Clear console" onClick={onClear}>
-          <ClearIcon />
-        </button>
-      </header>
-      <div
-        className="console-output"
-        ref={scroller}
-        role="log"
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-        }}
-      >
-        {segments.length === 0 ? (
-          <div className="console-empty">Output of the program shows here.</div>
-        ) : (
-          <pre>
-            {segments.map((s) => (
-              <Text key={s.id} segment={s} isFile={isFile} onOpen={onOpen} />
-            ))}
-          </pre>
-        )}
-      </div>
-    </section>
+    <div
+      className="console-output"
+      ref={scroller}
+      role="log"
+      aria-label="Console"
+      onScroll={(e) => {
+        const el = e.currentTarget;
+        pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+      }}
+    >
+      {segments.length === 0 ? (
+        <div className="console-empty">Output of the program shows here.</div>
+      ) : (
+        <pre>
+          {segments.map((s) => (
+            <Text key={s.id} segment={s} isFile={isFile} onOpen={onOpen} />
+          ))}
+        </pre>
+      )}
+    </div>
   );
 }
 

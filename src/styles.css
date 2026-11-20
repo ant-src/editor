@@ -14,6 +14,7 @@
   --breakpoint: #f43f5e;
   --paused: #f59e0b;
   --paused-bg: rgba(245, 158, 11, 0.2);
+  --warning: #b45309;
   --string: #b45309;
   --number: #2563eb;
   --keyword: #7c3aed;
@@ -39,6 +40,7 @@
     --breakpoint: #fb7185;
     --paused: #fbbf24;
     --paused-bg: rgba(251, 191, 36, 0.16);
+    --warning: #fbbf24;
     --string: #fdba74;
     --number: #93c5fd;
     --keyword: #c4b5fd;
@@ -647,18 +649,77 @@ svg.icon {
   cursor: pointer;
 }
 
-/* ---- console */
+/* ---- the panel under the editor: console and problems */
 
-.console-area {
+.bottom {
   flex: none;
   min-height: 0;
-}
-
-.console {
-  height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--bg);
+}
+
+.bottom.closed {
+  border-top: 1px solid var(--border);
+}
+
+.bottom-header {
+  padding-left: 6px;
+  gap: 4px;
+}
+
+.panel-tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.panel-tab {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.panel-tab:hover {
+  color: var(--fg);
+}
+
+.panel-tab[aria-selected="true"] {
+  color: var(--fg);
+}
+
+.bottom.closed .panel-tab[aria-selected="true"] {
+  color: var(--fg-muted);
+}
+
+.badge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+  color: var(--fg-muted);
+  font-size: 10.5px;
+  line-height: 16px;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.bottom-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .console-output {
@@ -674,8 +735,14 @@ svg.icon {
   overflow-wrap: anywhere;
 }
 
-.console-empty {
+.console-empty,
+.problems-empty {
+  padding: 0 12px;
   color: var(--fg-faint);
+}
+
+.console-output .console-empty {
+  padding: 0;
 }
 
 .console-stderr {
@@ -684,6 +751,10 @@ svg.icon {
 
 .console-info {
   color: var(--fg-faint);
+}
+
+.console-warning {
+  color: var(--warning);
 }
 
 .console-link {
@@ -695,6 +766,81 @@ svg.icon {
 
 .console-link:hover {
   color: var(--accent-fg);
+}
+
+.problems {
+  flex: 1;
+  overflow: auto;
+  padding-bottom: 8px;
+}
+
+.problem {
+  width: 100%;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 12px;
+  text-align: left;
+}
+
+.problem:hover {
+  background: var(--bg-hover);
+}
+
+.problem.error .icon {
+  color: var(--red);
+}
+
+.problem.warning .icon {
+  color: var(--warning);
+}
+
+.problem-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.problem-where {
+  flex: none;
+  margin-left: auto;
+  padding-left: 12px;
+  font: 12px var(--mono);
+  color: var(--fg-muted);
+}
+
+.problem-dir {
+  color: var(--fg-faint);
+}
+
+.problem-count {
+  flex: none;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.problem-count:hover {
+  background: var(--bg-hover);
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 550;
+}
+
+.count.error .icon {
+  color: var(--red);
+}
+
+.count.warning .icon {
+  color: var(--warning);
 }
 
 /* ---- debugger */

@@ -106,7 +106,7 @@ test("a panic shows on stderr with where it happened, and the exit code", async 
   expect(h.text("stdout")).toBe("before\n");
   expect(h.text("stderr")).toContain("panic: ");
   expect(h.text("stderr")).toContain("main.ant:3:");
-  expect(h.text("info")).toMatch(/Exited with code 1 in /);
+  expect(h.text("warning")).toMatch(/Exited with code 1 in /);
 });
 
 test("a program that does not load reports its errors by position", async () => {
@@ -114,7 +114,7 @@ test("a program that does not load reports its errors by position", async () => 
   h.runner.run({ files: { "main.ant": 'import "./missing.ant" { f }\nf()\n' }, path: "main.ant" });
   await h.until((s) => s.status === "idle");
   expect(h.text("stderr")).toMatch(/^main\.ant:1:\d+: /);
-  expect(h.text("info")).toContain("Exited with code 2");
+  expect(h.text("warning")).toContain("Exited with code 2");
 });
 
 test("stop ends a running program by replacing its worker, and the next run works", async () => {
@@ -197,7 +197,7 @@ test("stepping over shows a variable appear and change, and stepping out and in 
   await h.until((s) => s.status === "idle");
   expect(h.runner.getState()).toEqual({ status: "idle", debugging: false, stop: undefined });
   expect(h.text("stdout")).toBe("total 12\n");
-  expect(h.text("info")).toBe("Debugging main.ant\nFinished\n");
+  expect(h.text("info")).toMatch(/^Debugging main\.ant\nFinished in \d+ ms\n$/);
 });
 
 test("a breakpoint binds to the next statement, or says why it cannot", async () => {
@@ -254,7 +254,7 @@ test("debug pauses at an uncaught panic, with its message, and then reports it",
   h.runner.resume("continue");
   await h.until((s) => s.status === "idle");
   expect(h.text("stderr")).toContain("panic: ");
-  expect(h.text("info")).toContain("Exited with code 1");
+  expect(h.text("warning")).toContain("Exited with code 1");
 });
 
 test("stop ends a paused session, and a program that does not load never starts", async () => {
@@ -269,5 +269,5 @@ test("stop ends a paused session, and a program that does not load never starts"
   h.runner.debug({ files: { "main.ant": "var x = \n" }, path: "main.ant" });
   await h.until((s) => s.status === "idle");
   expect(h.text("stderr")).toMatch(/^main\.ant:\d+:\d+: /);
-  expect(h.text("info")).toContain("Exited with code 2");
+  expect(h.text("warning")).toContain("Exited with code 2");
 });

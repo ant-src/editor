@@ -1,11 +1,30 @@
 // The editor: a folder's file tree on the left, the code in the middle with the console under
 // it, and the debugger's panel on the right while a program is debugged.
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent,
+} from "react";
 import { CodeEditor } from "./components/CodeEditor";
 import { Console } from "./components/Console";
 import { FileTree } from "./components/FileTree";
-import { BugIcon, ChevronDownIcon, CloseIcon, PlayIcon, SidebarIcon, StopIcon } from "./components/icons";
+import {
+  BugIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  ClearIcon,
+  CloseIcon,
+  PlayIcon,
+  SidebarIcon,
+  StopIcon,
+} from "./components/icons";
 import { Menu, type MenuEntry } from "./components/Menu";
+import { Count, Problems } from "./components/Problems";
 import { Variables } from "./components/Variables";
 import { ConsoleStore } from "./console";
 import { BreakpointStore } from "./debug/breakpoints";
@@ -22,6 +41,7 @@ import {
 import { zip } from "./fs/zip";
 import { key } from "./keys";
 import logo from "./logo.svg";
+import { describe, ProblemStore } from "./problems";
 import { isAnt, Project } from "./project";
 import AntWorker from "./run/ant.worker?worker";
 import type { WorkerLike } from "./run/protocol";
@@ -29,6 +49,19 @@ import { Runner, type RunnerState, type StepCommand } from "./run/runner";
 
 const output = new ConsoleStore();
 const breakpoints = new BreakpointStore();
+const problems = new ProblemStore();
+
+monaco.editor.onDidChangeMarkers(() =>
+  problems.set(
+    monaco.editor.getModelMarkers({}).map((m) => ({
+      path: pathOf(m.resource),
+      line: m.startLineNumber,
+      column: m.startColumn,
+      message: m.message,
+      severity: m.severity,
+    })),
+  ),
+);
 
 let booted: Promise<Runner> | undefined;
 
@@ -176,6 +209,9 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
   const [sidebar, setSidebar] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [consoleHeight, setConsoleHeight] = useState(220);
+  const [panel, setPanel] = useState<{ tab: "console" | "problems"; open: boolean }>({ tab: "console", open: true });
+  const allProblems = useSyncExternalStore(problems.subscribe, problems.getState);
+  const problemList = useMemo(() => allProblems.filter((p) => project.has(p.path)), [allProblems, files, project]);
 
   const stop = run.status === "paused" ? run.stop : undefined;
   const frame = picked && picked.stop === stop ? picked.frame : 0;
@@ -282,6 +318,11 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
     output.clear();
     if (debug) runner.debug(program, breakpoints.all());
     else runner.run(program);
+    // The run goes ahead with the errors the checker found, but the console says what they are.
+    const errors = problemList.filter((p) => p.severity === "error" && isAnt(p.path));
+    for (const p of errors.slice(0, 5)) output.write("warning", describe(p));
+    if (errors.length > 5) output.write("warning", `and ${errors.length - 5} more errors, in Problems\n`);
+    setPanel({ tab: "console", open: true });
   };
   const step = (command: StepCommand) => runner?.resume(command);
   const save = (path: string | null) =>
@@ -323,6 +364,15 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
     }
   };
 
+  /** switchTab moves between the panel's tabs with the arrow keys. */
+  const switchTab = (e: ReactKeyboardEvent) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const tab = panel.tab === "console" ? "problems" : "console";
+    setPanel({ tab, open: true });
+    document.getElementById("panel-" + tab)?.focus();
+    e.preventDefault();
+  };
+
   const projectEntries: MenuEntry[] = [
     ...(onSaveToFolder ? [{ label: "Save to folder…", onSelect: onSaveToFolder }] : []),
     ...(onOpenFolder ? [{ label: "Open folder…", onSelect: onOpenFolder }] : []),
@@ -359,6 +409,7 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
       else void save(active);
     } else if (mod && e.key === "Enter") start(false);
     else if (mod && e.key.toLowerCase() === "b" && !e.shiftKey) setSidebar((s) => !s);
+    else if (mod && e.key.toLowerCase() === "j" && !e.shiftKey) setPanel((p) => ({ ...p, open: !p.open }));
     else if (e.key === "F5" && e.shiftKey) runner?.stop();
     else if (e.key === "F5" && run.status === "paused") step("continue");
     else if (e.key === "F5") start(true);
@@ -458,6 +509,15 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
         </div>
 
         <div className="toolbar-end">
+          {problemList.length > 0 && (
+            <button
+              className="problem-count"
+              title="Show the problems"
+              onClick={() => setPanel({ tab: "problems", open: true })}
+            >
+              <Count problems={problemList} />
+            </button>
+          )}
           <span className={"status " + run.status} role="status">
             {failure
               ? `Ant did not load: ${failure}`
@@ -541,27 +601,82 @@ function Ide({ project, runner, failure, onOpenFolder, onSaveToFolder }: IdeProp
               <div className="editor-empty">
                 <p>Open a file from the tree.</p>
                 <dl>
-                  <dt>⌘S</dt>
+                  <dt>{key("mod+S")}</dt>
                   <dd>Save</dd>
-                  <dt>⌘Enter</dt>
+                  <dt>{key("mod+Enter")}</dt>
                   <dd>Run</dd>
                   <dt>F5</dt>
                   <dd>Debug, continue</dd>
-                  <dt>F10 · F11 · ⇧F11</dt>
+                  <dt>F10 · F11 · {key("shift+F11")}</dt>
                   <dd>Step over, into, out</dd>
+                  <dt>{key("mod+B")}</dt>
+                  <dd>Toggle the file tree</dd>
+                  <dt>{key("mod+J")}</dt>
+                  <dd>Toggle the panel</dd>
                 </dl>
               </div>
             )}
           </div>
-          <Resizer direction="row" onResize={(d) => setConsoleHeight((h) => clamp(h - d, 80, 640))} />
-          <div className="console-area" style={{ height: consoleHeight }}>
-            <Console
-              segments={segments}
-              isFile={(path) => project.has(path)}
-              onOpen={(path, line, column) => void open(path, { line, column })}
-              onClear={() => output.clear()}
-            />
-          </div>
+          {panel.open && <Resizer direction="row" onResize={(d) => setConsoleHeight((h) => clamp(h - d, 80, 640))} />}
+          <section
+            className={"bottom" + (panel.open ? "" : " closed")}
+            style={panel.open ? { height: consoleHeight } : undefined}
+            aria-label="Panel"
+          >
+            <header className="panel-header bottom-header">
+              <div className="panel-tabs" role="tablist" aria-label="Panel" onKeyDown={switchTab}>
+                {(["console", "problems"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    id={"panel-" + tab}
+                    className="panel-tab"
+                    role="tab"
+                    aria-selected={panel.tab === tab}
+                    aria-controls="panel-body"
+                    tabIndex={panel.tab === tab ? 0 : -1}
+                    onClick={() => setPanel({ tab, open: true })}
+                  >
+                    {tab === "console" ? "Console" : "Problems"}
+                    {tab === "problems" && problemList.length > 0 && (
+                      <span className="badge">{problemList.length}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              {panel.open && panel.tab === "console" && (
+                <button
+                  className="icon-button"
+                  title="Clear the console"
+                  aria-label="Clear console"
+                  onClick={() => output.clear()}
+                >
+                  <ClearIcon />
+                </button>
+              )}
+              <button
+                className="icon-button"
+                title={`${panel.open ? "Hide" : "Show"} the panel (${key("mod+J")})`}
+                aria-label={panel.open ? "Hide the panel" : "Show the panel"}
+                aria-expanded={panel.open}
+                onClick={() => setPanel({ ...panel, open: !panel.open })}
+              >
+                {panel.open ? <ChevronDownIcon /> : <ChevronUpIcon />}
+              </button>
+            </header>
+            {panel.open && (
+              <div id="panel-body" className="bottom-body" role="tabpanel" aria-labelledby={"panel-" + panel.tab}>
+                {panel.tab === "console" ? (
+                  <Console
+                    segments={segments}
+                    isFile={(path) => project.has(path)}
+                    onOpen={(path, line, column) => void open(path, { line, column })}
+                  />
+                ) : (
+                  <Problems problems={problemList} onOpen={(path, line, column) => void open(path, { line, column })} />
+                )}
+              </div>
+            )}
+          </section>
         </div>
 
         {run.debugging && runner && (

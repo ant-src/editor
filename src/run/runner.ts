@@ -13,7 +13,8 @@ export type Status =
   /** ant.wasm did not load. */
   | "unavailable";
 
-export type Stream = "stdout" | "stderr" | "info";
+/** What the program wrote, and what the editor says about the run: info in passing, warning to heed. */
+export type Stream = "stdout" | "stderr" | "info" | "warning";
 
 export interface Frame {
   id: number;
@@ -220,10 +221,10 @@ export class Runner {
 
   private finish(exitCode: number) {
     if (!this.active) return;
-    const debugged = this.state.debugging;
     this.reset();
-    const time = debugged ? "" : ` in ${duration(performance.now() - this.started)}`;
-    this.handlers.output("info", exitCode === 0 ? `Finished${time}\n` : `Exited with code ${exitCode}${time}\n`);
+    const time = ` in ${duration(performance.now() - this.started)}`;
+    if (exitCode === 0) this.handlers.output("info", `Finished${time}\n`);
+    else this.handlers.output("warning", `Exited with code ${exitCode}${time}\n`);
     this.update({ status: "idle", debugging: false, stop: undefined });
   }
 
