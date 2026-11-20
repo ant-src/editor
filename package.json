@@ -1,0 +1,36 @@
+{
+  "name": "ant-editor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "lint": "oxlint --deny-warnings"
+  },
+  "dependencies": {
+    "@ant-lang/monaco": "file:../ant-web/packages/monaco",
+    "@ant-lang/wasm": "file:../ant-web/packages/wasm",
+    "@fontsource/commit-mono": "^5.3.0",
+    "monaco-editor": "^0.57.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "jsdom": "^31.0.1",
+    "oxfmt": "^0.75.0",
+    "oxlint": "^1.90.0",
+    "typescript": "^5.9.0",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
+  }
+}
