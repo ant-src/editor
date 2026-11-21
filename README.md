@@ -30,12 +30,10 @@ Edit, run and debug [Ant](https://ant-lang.org) programs in the browser, with no
 
 ## Development
 
-The Ant packages come from a checkout of [ant-web](https://github.com/ant-src/ant-web) next to
-this repository, which builds `ant.wasm` from a checkout of [ant](https://github.com/ant-src/ant)
-next to it:
+The Ant packages, [@ant-lang/wasm](https://www.npmjs.com/package/@ant-lang/wasm) and
+[@ant-lang/monaco](https://www.npmjs.com/package/@ant-lang/monaco), come from npm:
 
 ```sh
-(cd ../ant-web && npm install && npm run build)
 npm install
 npm run dev
 ```

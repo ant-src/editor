@@ -13,8 +13,8 @@
     "lint": "oxlint --deny-warnings"
   },
   "dependencies": {
-    "@ant-lang/monaco": "file:../ant-web/packages/monaco",
-    "@ant-lang/wasm": "file:../ant-web/packages/wasm",
+    "@ant-lang/monaco": "^0.8.0",
+    "@ant-lang/wasm": "^0.8.0",
     "@fontsource/commit-mono": "^5.3.0",
     "monaco-editor": "^0.57.0",
     "react": "^19.3.1",
