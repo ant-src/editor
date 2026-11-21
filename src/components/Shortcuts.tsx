@@ -3,7 +3,7 @@
 import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import { key, keymap, type Shortcut } from "../keys";
 import { KeyboardIcon } from "./icons";
-import { usePopover } from "./Menu";
+import { isOpener, usePopover } from "./Menu";
 
 interface ShortcutsButtonProps {
   open: boolean;
@@ -63,7 +63,8 @@ export function ShortcutsPanel({ x, y, onClose }: ShortcutsPanelProps) {
       }}
       // Tab out of the panel closes it, as a click elsewhere does
       onBlur={(e) => {
-        if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) onClose();
+        const to = e.relatedTarget;
+        if (to && !e.currentTarget.contains(to as Node) && !isOpener(to)) onClose();
       }}
     >
       <h2 id="shortcuts-title">Keyboard shortcuts</h2>

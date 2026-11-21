@@ -3,7 +3,7 @@
 import { useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import { getSettings, maxFontSize, minFontSize, set, subscribe, themes, validFontSize, type Theme } from "../settings";
 import { GearIcon } from "./icons";
-import { usePopover } from "./Menu";
+import { isOpener, usePopover } from "./Menu";
 
 const themeLabels: Record<Theme, string> = { system: "System", light: "Light", dark: "Dark" };
 
@@ -57,7 +57,8 @@ export function SettingsPanel({ x, y, onClose }: SettingsPanelProps) {
       }}
       // Tab out of the panel closes it, as a click elsewhere does
       onBlur={(e) => {
-        if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) onClose();
+        const to = e.relatedTarget;
+        if (to && !e.currentTarget.contains(to as Node) && !isOpener(to)) onClose();
       }}
     >
       <div className="settings-row">

@@ -56,6 +56,9 @@ import { forgetTargets, moveTargets, RunTargets, targetsKey } from "./run/target
 const output = new ConsoleStore();
 const breakpoints = new BreakpointStore();
 const problems = new ProblemStore();
+/** inMenu says whether target is in an open menu, whose keys are its own. */
+const inMenu = (target: EventTarget | null) => target instanceof Element && target.closest('[role="menu"]') !== null;
+
 /** brief is the keys the empty editor shows. */
 const brief = keymap.flatMap((g) => g.shortcuts.filter((s) => s.brief));
 
@@ -643,7 +646,8 @@ function Ide(props: IdeProps) {
     else if (e.key === "F5") start(true);
     else if (e.key === "F10") step("next");
     else if (e.key === "F11") step(e.shiftKey ? "stepOut" : "stepIn");
-    else if (e.key === "?" && !mod && !e.altKey && !typesText(e.target)) setShortcuts((open) => !open);
+    else if (e.key === "?" && !mod && !e.altKey && !e.repeat && !typesText(e.target) && !inMenu(e.target))
+      setShortcuts((open) => !open);
     else return false;
     return true;
   };

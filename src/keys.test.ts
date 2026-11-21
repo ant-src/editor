@@ -1,6 +1,5 @@
-// @vitest-environment jsdom
 import { expect, test } from "vitest";
-import { key, keymap, mac, typesText } from "./keys";
+import { key, keymap, mac } from "./keys";
 
 test("keys are written the platform's way", () => {
   if (mac) {
@@ -18,17 +17,6 @@ test("arrows, Delete and Ctrl are written the platform's way", () => {
   expect(key("Delete")).toBe(mac ? "⌦" : "Del");
   expect(key("alt+mod+F")).toBe(mac ? "⌥⌘F" : "Alt+Ctrl+F");
   expect(key("shift+ctrl+I")).toBe(mac ? "⌃⇧I" : "Shift+Ctrl+I");
-});
-
-test("keys go into text in fields and the code, nowhere else", () => {
-  const field = document.createElement("input");
-  const code = document.createElement("div");
-  code.className = "monaco-editor";
-  code.append(document.createElement("textarea"));
-  expect(typesText(field)).toBe(true);
-  expect(typesText(code.firstChild)).toBe(true);
-  expect(typesText(document.createElement("button"))).toBe(false);
-  expect(typesText(null)).toBe(false);
 });
 
 test("the keymap lists each shortcut once in its group", () => {

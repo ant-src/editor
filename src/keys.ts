@@ -2,7 +2,8 @@
 // keys there are, as the shortcuts panel lists them.
 
 export const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-const linux = typeof navigator !== "undefined" && !mac && /Linux/.test(navigator.platform);
+// as Monaco decides it, for the keys it binds only on Linux: not ChromeOS, whose platform says Linux too
+const linux = typeof navigator !== "undefined" && !mac && navigator.userAgent.includes("Linux");
 
 /** The order of modifiers on a Mac: ⌃⌥⇧⌘. */
 const order = ["ctrl", "alt", "shift", "mod"];

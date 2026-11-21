@@ -299,6 +299,7 @@ test("the shortcuts panel lists the keys by group, and closes on Escape and a cl
   }
   render(<Toolbar />);
   const button = screen.getByLabelText("Keyboard shortcuts");
+  button.focus();
   fireEvent.click(button);
   const dialog = screen.getByRole("dialog", { name: "Keyboard shortcuts" });
   expect(document.activeElement).toBe(dialog);
@@ -310,9 +311,19 @@ test("the shortcuts panel lists the keys by group, and closes on Escape and a cl
   fireEvent.keyDown(dialog, { key: "Escape" });
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(button.getAttribute("aria-expanded")).toBe("false");
+  expect(document.activeElement).toBe(button); // the focus goes back
 
   fireEvent.click(button);
   expect(screen.getByRole("dialog")).toBeTruthy();
   fireEvent.pointerDown(document.body);
+  expect(screen.queryByRole("dialog")).toBeNull();
+
+  // a second click on the button closes it, and does not open it again: the press takes the focus
+  // out of the panel to the button first
+  fireEvent.click(button);
+  fireEvent.pointerDown(button);
+  fireEvent.focusOut(screen.getByRole("dialog"), { relatedTarget: button });
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  fireEvent.click(button);
   expect(screen.queryByRole("dialog")).toBeNull();
 });

@@ -125,6 +125,7 @@ export function Menu({ entries, x, y, label, onClose }: MenuProps) {
 /**
  * usePopover keeps a box that opens at a point (a menu, a panel) in the window, gives it the
  * focus, closes it on a click elsewhere, and gives the focus back where it was when it closes.
+ * A click on the button that opened it is left to the button, which closes it.
  */
 export function usePopover(
   box: RefObject<HTMLElement | null>,
@@ -136,6 +137,8 @@ export function usePopover(
   const [at, setAt] = useState({ x, y });
   const close = useRef(onClose);
   close.current = onClose;
+  // where the focus was before the box took it: read while rendering, before the layout effect moves it
+  const [before] = useState(() => document.activeElement as HTMLElement | null);
 
   useLayoutEffect(() => {
     const el = box.current!;
@@ -148,9 +151,8 @@ export function usePopover(
   }, [x, y]);
 
   useEffect(() => {
-    const before = document.activeElement as HTMLElement | null;
     const outside = (e: Event) => {
-      if (!box.current?.contains(e.target as Node)) close.current();
+      if (!box.current?.contains(e.target as Node) && !isOpener(e.target)) close.current();
     };
     const dismiss = () => close.current();
     window.addEventListener("pointerdown", outside, true);
@@ -167,6 +169,14 @@ export function usePopover(
   }, []);
 
   return at;
+}
+
+/**
+ * isOpener says whether el is the button of the menu or panel that is open: a click on it is the
+ * button's to handle, which closes it, and must not close it first only to have the click open it again.
+ */
+export function isOpener(el: EventTarget | null): boolean {
+  return el instanceof Element && el.closest('[aria-haspopup][aria-expanded="true"]') !== null;
 }
 
 function items(menu: HTMLElement): HTMLButtonElement[] {
