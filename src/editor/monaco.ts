@@ -6,7 +6,7 @@ import EditorWorker from "monaco-editor/editor/editor.worker?worker";
 import { setupAnt, type AntLanguageServer } from "@ant-lang/monaco";
 import LanguageServerWorker from "@ant-lang/monaco/worker?worker";
 import wasmUrl from "@ant-lang/wasm/ant.wasm?url";
-import { isDark, subscribe } from "../theme";
+import { isDark, subscribe } from "../settings";
 import { defineThemes } from "./themes";
 
 export { monaco };

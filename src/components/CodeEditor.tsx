@@ -2,6 +2,7 @@
 // there, and the line the program is paused at.
 import { useEffect, useRef } from "react";
 import { monaco } from "../editor/monaco";
+import { getSettings, lineHeight, subscribe } from "../settings";
 
 export interface CodeEditorProps {
   model: monaco.editor.ITextModel | null;
@@ -31,14 +32,16 @@ export function CodeEditor(props: CodeEditorProps) {
   latest.current = props;
 
   useEffect(() => {
+    const { fontSize, wordWrap } = getSettings();
     const ed = monaco.editor.create(container.current!, {
       model: null,
       automaticLayout: true,
       glyphMargin: true,
       minimap: { enabled: false },
       fontFamily: '"Commit Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace',
-      fontSize: 13,
-      lineHeight: 20,
+      fontSize,
+      lineHeight: lineHeight(fontSize),
+      wordWrap: wordWrap ? "on" : "off",
       lineNumbersMinChars: 3,
       padding: { top: 8 },
       scrollBeyondLastLine: false,
@@ -79,7 +82,15 @@ export function CodeEditor(props: CodeEditorProps) {
       const before = latest.current.breakpoints;
       if (now.length !== before.length || now.some((l, i) => l !== before[i])) latest.current.onBreakpointsMoved(now);
     });
-    return () => ed.dispose();
+    // the settings menu changes the text size and the wrapping
+    const unsubscribe = subscribe(() => {
+      const { fontSize, wordWrap } = getSettings();
+      ed.updateOptions({ fontSize, lineHeight: lineHeight(fontSize), wordWrap: wordWrap ? "on" : "off" });
+    });
+    return () => {
+      unsubscribe();
+      ed.dispose();
+    };
   }, []);
 
   // The buffer shown, with the scroll position and the selection it had when it last showed.

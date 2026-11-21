@@ -19,12 +19,10 @@ import {
   ChevronUpIcon,
   ClearIcon,
   CloseIcon,
-  MoonIcon,
+  GearIcon,
   RunIcon,
   SidebarIcon,
   StopIcon,
-  SunIcon,
-  SystemIcon,
 } from "./components/icons";
 import { Menu, type MenuEntry } from "./components/Menu";
 import { Count, Problems } from "./components/Problems";
@@ -49,7 +47,7 @@ import { key } from "./keys";
 import logo from "./logo.svg";
 import { ProblemStore, runNotes } from "./problems";
 import { isAnt, Project } from "./project";
-import { getTheme, setTheme, subscribe as onTheme, type Theme } from "./theme";
+import { fontSizes, getSettings, set as setSetting, subscribe as onSettings, themes, type Theme } from "./settings";
 import AntWorker from "./run/ant.worker?worker";
 import type { WorkerLike } from "./run/protocol";
 import { Runner, type RunnerState, type StepCommand } from "./run/runner";
@@ -759,7 +757,7 @@ function Ide(props: IdeProps) {
               <BugIcon />
             </button>
           </div>
-          <ThemeButton />
+          <SettingsButton />
         </div>
         {targetMenu && (
           <Menu
@@ -1023,25 +1021,46 @@ function NameInput(props: { name: string; onSubmit(name: string): string | undef
   );
 }
 
-const themes: Record<Theme, { next: Theme; label: string; icon: () => React.JSX.Element }> = {
-  system: { next: "light", label: "System colors", icon: SystemIcon },
-  light: { next: "dark", label: "Light colors", icon: SunIcon },
-  dark: { next: "system", label: "Dark colors", icon: MoonIcon },
-};
+const themeLabels: Record<Theme, string> = { system: "System", light: "Light", dark: "Dark" };
 
-/** ThemeButton shows the colors in use, and goes on to the next: system, light, dark. */
-function ThemeButton() {
-  const theme = useSyncExternalStore(onTheme, getTheme);
-  const { next, label, icon: Icon } = themes[theme];
+/** SettingsButton opens the menu of the editor's settings: the colors, the text size, wrapping. */
+function SettingsButton() {
+  const settings = useSyncExternalStore(onSettings, getSettings);
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
+  const entries: MenuEntry[] = [
+    { caption: "Theme" },
+    ...themes.map((theme) => ({
+      label: themeLabels[theme],
+      checked: settings.theme === theme,
+      onSelect: () => setSetting("theme", theme),
+    })),
+    "separator",
+    { caption: "Font size" },
+    ...fontSizes.map((size) => ({
+      label: `${size}px`,
+      checked: settings.fontSize === size,
+      onSelect: () => setSetting("fontSize", size),
+    })),
+    "separator",
+    { label: "Word wrap", checked: settings.wordWrap, onSelect: () => setSetting("wordWrap", !settings.wordWrap) },
+  ];
   return (
-    <button
-      className="icon-button"
-      title={`${label}; switch to ${themes[next].label.toLowerCase()}`}
-      aria-label={`${label}; switch to ${themes[next].label.toLowerCase()}`}
-      onClick={() => setTheme(next)}
-    >
-      <Icon />
-    </button>
+    <>
+      <button
+        className="icon-button"
+        title="Settings"
+        aria-label="Settings"
+        aria-haspopup="menu"
+        aria-expanded={at !== null}
+        onClick={(e) => {
+          const box = e.currentTarget.getBoundingClientRect();
+          setAt(at ? null : { x: box.right, y: box.bottom + 4 });
+        }}
+      >
+        <GearIcon />
+      </button>
+      {at && <Menu label="Settings" x={at.x} y={at.y} entries={entries} onClose={() => setAt(null)} />}
+    </>
   );
 }
 

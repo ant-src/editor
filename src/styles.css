@@ -812,7 +812,7 @@ svg.icon {
 
 .console-output pre {
   margin: 0;
-  font: 12.5px/1.5 var(--mono);
+  font: var(--code-size, 13px) / 1.5 var(--mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
