@@ -16,6 +16,8 @@ export interface CodeEditorProps {
   onToggleBreakpoint(line: number): void;
   /** Called when an edit moved the breakpoints to other lines. */
   onBreakpointsMoved(lines: number[]): void;
+  /** Opens the panel of keyboard shortcuts, from Monaco's list of commands. */
+  onShowShortcuts(): void;
 }
 
 const { GlyphMarginLane, MouseTargetType, TrackedRangeStickiness } = monaco.editor;
@@ -81,6 +83,11 @@ export function CodeEditor(props: CodeEditorProps) {
       const now = [...new Set(lines)].sort((a, b) => a - b);
       const before = latest.current.breakpoints;
       if (now.length !== before.length || now.some((l, i) => l !== before[i])) latest.current.onBreakpointsMoved(now);
+    });
+    ed.addAction({
+      id: "ant.showShortcuts",
+      label: "Show Keyboard Shortcuts",
+      run: () => latest.current.onShowShortcuts(),
     });
     // the settings menu changes the text size and the wrapping
     const unsubscribe = subscribe(() => {

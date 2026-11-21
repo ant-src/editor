@@ -25,6 +25,7 @@ import {
 } from "./components/icons";
 import { Menu, type MenuEntry } from "./components/Menu";
 import { SettingsButton } from "./components/Settings";
+import { KeyList, ShortcutsButton } from "./components/Shortcuts";
 import { Count, Problems } from "./components/Problems";
 import { Variables } from "./components/Variables";
 import { ConsoleStore } from "./console";
@@ -43,7 +44,7 @@ import {
 import { BrowserProjects, type ProjectsState } from "./fs/projects";
 import { RecentFolders, type RecentFolder } from "./fs/recent";
 import { zip } from "./fs/zip";
-import { key } from "./keys";
+import { key, keymap, typesText } from "./keys";
 import logo from "./logo.svg";
 import { ProblemStore, runNotes } from "./problems";
 import { isAnt, Project } from "./project";
@@ -55,6 +56,8 @@ import { forgetTargets, moveTargets, RunTargets, targetsKey } from "./run/target
 const output = new ConsoleStore();
 const breakpoints = new BreakpointStore();
 const problems = new ProblemStore();
+/** brief is the keys the empty editor shows. */
+const brief = keymap.flatMap((g) => g.shortcuts.filter((s) => s.brief));
 
 monaco.editor.onDidChangeMarkers(() =>
   problems.set(
@@ -373,6 +376,7 @@ function Ide(props: IdeProps) {
   const location = stop?.frames[frame];
   const [projectMenu, setProjectMenu] = useState<{ x: number; y: number } | null>(null);
   const [targetMenu, setTargetMenu] = useState<{ x: number; y: number } | null>(null);
+  const [shortcuts, setShortcuts] = useState(false);
 
   // What Run runs: the file picked, else the current file when it is an Ant file.
   const targets = useMemo(() => new RunTargets(targetsKey(project.workspace)), [project]);
@@ -639,6 +643,7 @@ function Ide(props: IdeProps) {
     else if (e.key === "F5") start(true);
     else if (e.key === "F10") step("next");
     else if (e.key === "F11") step(e.shiftKey ? "stepOut" : "stepIn");
+    else if (e.key === "?" && !mod && !e.altKey && !typesText(e.target)) setShortcuts((open) => !open);
     else return false;
     return true;
   };
@@ -756,6 +761,7 @@ function Ide(props: IdeProps) {
               <BugIcon />
             </button>
           </div>
+          <ShortcutsButton open={shortcuts} onOpenChange={setShortcuts} />
           <SettingsButton />
         </div>
         {targetMenu && (
@@ -852,26 +858,12 @@ function Ide(props: IdeProps) {
               reveal={reveal && reveal.path === active ? reveal : null}
               onToggleBreakpoint={toggleBreakpoint}
               onBreakpointsMoved={moveBreakpoints}
+              onShowShortcuts={() => setShortcuts(true)}
             />
             {!model && (
               <div className="editor-empty">
                 <p>Open a file from the tree.</p>
-                <dl>
-                  <dt>{key("mod+S")}</dt>
-                  <dd>Save</dd>
-                  <dt>{key("mod+Enter")}</dt>
-                  <dd>Run</dd>
-                  <dt>{key("mod+shift+Enter")}</dt>
-                  <dd>Run the current file</dd>
-                  <dt>F5</dt>
-                  <dd>Debug, continue</dd>
-                  <dt>F10 · F11 · {key("shift+F11")}</dt>
-                  <dd>Step over, into, out</dd>
-                  <dt>{key("mod+B")}</dt>
-                  <dd>Toggle the file tree</dd>
-                  <dt>{key("mod+J")}</dt>
-                  <dd>Toggle the panel</dd>
-                </dl>
+                <KeyList shortcuts={brief} />
               </div>
             )}
           </div>

@@ -654,6 +654,10 @@ svg.icon {
   margin: 0;
 }
 
+.editor-empty kbd {
+  font: inherit;
+}
+
 /* Monaco's gutter: breakpoints and the paused line */
 
 .monaco-editor .bp-glyph,
@@ -1302,4 +1306,92 @@ svg.icon {
 
 .switch[aria-checked="true"]::after {
   transform: translateX(12px);
+}
+
+/* The keyboard shortcuts panel: the groups side by side, a key and what it does on each line. */
+.shortcuts {
+  position: fixed;
+  z-index: 100;
+  width: 600px;
+  max-width: calc(100vw - 8px);
+  max-height: calc(100vh - 8px);
+  overflow: auto;
+  padding: 12px 16px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.shortcuts:focus {
+  outline: none;
+}
+
+.shortcuts h2 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.shortcuts-groups {
+  columns: 2;
+  column-gap: 24px;
+}
+
+.shortcuts section {
+  break-inside: avoid;
+  padding-bottom: 12px;
+}
+
+.shortcuts h3 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+/* what a key does on the left, the key on the right, as in the menus */
+.shortcuts dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-auto-flow: row dense;
+  gap: 5px 12px;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.shortcuts dt {
+  grid-column: 2;
+  display: flex;
+  gap: 3px;
+  justify-content: flex-end;
+}
+
+.shortcuts dd {
+  grid-column: 1;
+  margin: 0;
+}
+
+.shortcuts kbd {
+  min-width: 20px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg-soft);
+  color: var(--fg);
+  font: 11px var(--sans);
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .shortcuts-groups {
+    columns: 1;
+  }
 }

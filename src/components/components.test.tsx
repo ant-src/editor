@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { Scope, Stop, Variable } from "../run/runner";
 import { Console } from "./Console";
@@ -7,6 +8,7 @@ import { FileTree } from "./FileTree";
 import { getSettings, set } from "../settings";
 import { Menu } from "./Menu";
 import { SettingsButton } from "./Settings";
+import { ShortcutsButton } from "./Shortcuts";
 import { Variables } from "./Variables";
 
 afterEach(cleanup);
@@ -288,4 +290,29 @@ test("the settings panel switches the theme, steps and types the font size, and 
   expect(screen.queryByRole("dialog")).toBeNull();
   set("fontSize", 13);
   set("wordWrap", false);
+});
+
+test("the shortcuts panel lists the keys by group, and closes on Escape and a click elsewhere", () => {
+  function Toolbar() {
+    const [open, setOpen] = useState(false);
+    return <ShortcutsButton open={open} onOpenChange={setOpen} />;
+  }
+  render(<Toolbar />);
+  const button = screen.getByLabelText("Keyboard shortcuts");
+  fireEvent.click(button);
+  const dialog = screen.getByRole("dialog", { name: "Keyboard shortcuts" });
+  expect(document.activeElement).toBe(dialog);
+  expect(button.getAttribute("aria-expanded")).toBe("true");
+  const run = screen.getByRole("region", { name: "Run and debug" });
+  expect(run.textContent).toContain("Step out");
+  expect(screen.getByRole("region", { name: "Code" }).textContent).toContain("Go to definition");
+
+  fireEvent.keyDown(dialog, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(button.getAttribute("aria-expanded")).toBe("false");
+
+  fireEvent.click(button);
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  fireEvent.pointerDown(document.body);
+  expect(screen.queryByRole("dialog")).toBeNull();
 });
