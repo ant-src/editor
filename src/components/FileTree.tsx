@@ -337,7 +337,7 @@ function DraftRow(props: {
   const [name, setName] = useState(draft.from !== undefined ? basename(draft.from) : "");
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
-  const done = useRef(false);
+  const done = useRef(false); // submitted, or cancelled with Escape: a blur that follows does nothing
 
   // A renamed file's name is selected up to its extension, so that typing replaces the name.
   useEffect(() => {
@@ -363,7 +363,10 @@ function DraftRow(props: {
   const onKeyDown = (e: KeyboardEvent) => {
     e.stopPropagation(); // the tree's keys are not for the name
     if (e.key === "Enter") void submit();
-    if (e.key === "Escape") onCancel();
+    if (e.key === "Escape") {
+      done.current = true;
+      onCancel();
+    }
   };
 
   const label = draft.from !== undefined ? "New name" : draft.kind === "file" ? "File name" : "Folder name";
@@ -382,7 +385,7 @@ function DraftRow(props: {
             setError("");
           }}
           onKeyDown={onKeyDown}
-          onBlur={() => (error ? undefined : name.trim() ? void submit() : onCancel())}
+          onBlur={() => (done.current || error ? undefined : name.trim() ? void submit() : onCancel())}
         />
       </div>
       {error && (

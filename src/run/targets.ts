@@ -4,6 +4,7 @@
 //
 // A file the project does not have now is left out of view but stays in storage: a folder
 // renamed a moment ago, another folder of the same name, or a tree cut short may show it again.
+import { firstProject } from "../fs/workspace";
 
 export interface TargetsState {
   /** The file picked to run, or null to run the current file. */
@@ -119,7 +120,7 @@ export function moveTargets(from: string, to: string, storage: KeyValue | undefi
  */
 export function targetsKey(workspace: { inBrowser: boolean; name: string; id?: string }): string {
   if (!workspace.inBrowser) return "ant-editor-run:" + workspace.name;
-  return "ant-editor-run:(browser)" + (workspace.id && workspace.id !== "workspace" ? "/" + workspace.id : "");
+  return "ant-editor-run:(browser)" + (workspace.id && workspace.id !== firstProject ? "/" + workspace.id : "");
 }
 
 /** forgetTargets drops the targets kept under a key, as when a project is deleted. */

@@ -157,15 +157,23 @@ export function App() {
   }, [leave, show]);
 
   const newProject = useCallback(async () => {
-    if (!projects || !(await leave())) return;
-    await show(await projects.create());
+    try {
+      if (!projects || !(await leave())) return;
+      await show(await projects.create());
+    } catch (err) {
+      output.write("stderr", `Making a project: ${(err as Error)?.message ?? err}\n`);
+    }
   }, [projects, leave, show]);
 
   const openProject = useCallback(
     async (id: string) => {
-      const from = current.current?.workspace;
-      if (!projects || (from?.inBrowser && from.id === id) || !(await leave())) return;
-      await show(await projects.open(id));
+      try {
+        const from = current.current?.workspace;
+        if (!projects || (from?.inBrowser && from.id === id) || !(await leave())) return;
+        await show(await projects.open(id));
+      } catch (err) {
+        output.write("stderr", `Opening a project: ${(err as Error)?.message ?? err}\n`);
+      }
     },
     [projects, leave, show],
   );
@@ -181,7 +189,7 @@ export function App() {
           runner?.stop();
           output.clear();
           const next = projects.getState().projects.find((p) => p.id !== id);
-          await show(next ? await projects.open(next.id) : await projects.create());
+          await show(next ? await projects.open(next.id) : await projects.create(id));
         }
         await projects.remove(id);
         forgetTargets(targetsKey({ inBrowser: true, name: project.name, id }));
@@ -196,7 +204,7 @@ export function App() {
   const renameProject = useCallback(
     (name: string): string | undefined => {
       const open = current.current;
-      if (!projects || !open?.workspace.inBrowser || !open.workspace.id) return;
+      if (!projects || !open?.workspace.inBrowser || !open.workspace.id) return "This project cannot be renamed";
       try {
         projects.rename(open.workspace.id, name);
       } catch (err) {
@@ -221,8 +229,13 @@ export function App() {
       await from.workspace.copyTo(target);
       moveTargets(targetsKey(from.workspace), targetsKey(target)); // the files to run come along
       await show(target, true);
-      if (from.workspace.id) await projects?.remove(from.workspace.id); // it lives on disk now
       output.write("info", `Saved to the folder ${target.name}\n`);
+      // it lives on disk now; the copy in the browser goes
+      if (from.workspace.id) {
+        await projects
+          ?.remove(from.workspace.id)
+          .catch((err) => output.write("warning", `The copy in the browser was not deleted: ${err?.message ?? err}\n`));
+      }
     } catch (err) {
       output.write("stderr", `Saving to a folder: ${(err as Error)?.message ?? err}\n`);
     }
@@ -914,8 +927,10 @@ function NameInput(props: { name: string; onSubmit(name: string): string | undef
   const [value, setValue] = useState(name);
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
+  const cancelled = useRef(false); // Escape: no blur that follows keeps the name typed
   useEffect(() => input.current?.select(), []);
   const submit = () => {
+    if (cancelled.current) return;
     if (value.trim() === name) return onDone();
     const problem = onSubmit(value);
     if (problem) setError(problem);
@@ -937,7 +952,10 @@ function NameInput(props: { name: string; onSubmit(name: string): string | undef
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") submit();
-          if (e.key === "Escape") onDone();
+          if (e.key === "Escape") {
+            cancelled.current = true;
+            onDone();
+          }
         }}
         onBlur={() => (error ? onDone() : submit())}
       />

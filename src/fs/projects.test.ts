@@ -77,3 +77,46 @@ test("a list that does not parse starts over", () => {
       .projects.map((p) => p.id),
   ).toEqual(["workspace"]);
 });
+
+test("two tabs of the editor add to one list", async () => {
+  const { projects } = setup();
+  const a = projects();
+  const b = projects();
+  await a.create();
+  await b.create();
+  b.rename("p1", "from a");
+  expect(
+    projects()
+      .getState()
+      .projects.map((p) => [p.id, p.name]),
+  ).toEqual([
+    ["workspace", "Untitled"],
+    ["p1", "from a"],
+    ["p2", "Untitled 3"], // b saw the project a made
+  ]);
+});
+
+test("a project made to replace the last one takes its name", async () => {
+  const { projects } = setup();
+  const list = projects();
+  const next = await list.create("workspace");
+  await list.remove("workspace");
+  expect(next.name).toBe("Untitled");
+  expect(list.getState().projects.map((p) => p.name)).toEqual(["Untitled"]);
+});
+
+test("a project whose folder cannot be made stays off the list", async () => {
+  const { projects } = setup();
+  const failing = new BrowserProjects(
+    { open: () => Promise.reject(new Error("quota")), remove: async () => {} },
+    undefined,
+    () => "p9",
+  );
+  await expect(failing.create()).rejects.toThrow("quota");
+  expect(failing.getState().projects.map((p) => p.id)).toEqual(["workspace"]);
+  expect(
+    projects()
+      .getState()
+      .projects.map((p) => p.id),
+  ).toEqual(["workspace"]);
+});

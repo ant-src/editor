@@ -26,6 +26,9 @@ const key = "ant-editor-projects";
 /** The name a new project gets, numbered after the first. */
 const untitled = "Untitled";
 
+/** The list before there is one: the project the editor kept before it kept several. */
+const first: ProjectsState = { projects: [{ id: firstProject, name: untitled }], last: firstProject };
+
 export class BrowserProjects {
   private state: ProjectsState;
   private listeners = new Set<() => void>();
@@ -39,7 +42,15 @@ export class BrowserProjects {
     private storage: KeyValue | undefined = browserStorage(),
     private ids: () => string = newId,
   ) {
-    this.state = load(storage) ?? { projects: [{ id: firstProject, name: untitled }], last: firstProject };
+    this.state = load(storage) ?? first;
+    // Another tab of the editor changes the same list.
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", (e) => {
+        if (e.key !== key) return;
+        this.state = load(storage) ?? this.state;
+        for (const listener of this.listeners) listener();
+      });
+    }
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -49,7 +60,9 @@ export class BrowserProjects {
 
   getState = (): ProjectsState => this.state;
 
-  private update(state: ProjectsState) {
+  /** update changes the list as it is in storage now, which another tab may have changed. */
+  private update(change: (state: ProjectsState) => ProjectsState) {
+    const state = change(load(this.storage) ?? this.state);
     this.state = state;
     try {
       this.storage?.setItem(key, JSON.stringify(state));
@@ -63,7 +76,7 @@ export class BrowserProjects {
     if (!project) throw new Error(`There is no project ${id} in this browser`);
     const workspace = new Workspace(await this.folders.open(id), true, project.name, id);
     if ((await workspace.tree()).nodes.length === 0) await workspace.write("main.ant", starter);
-    if (this.state.last !== id) this.update({ ...this.state, last: id });
+    if (this.state.last !== id) this.update((state) => ({ ...state, last: id }));
     return workspace;
   }
 
@@ -74,13 +87,19 @@ export class BrowserProjects {
     return id ? this.open(id) : this.create();
   }
 
-  /** create makes a project with a name no other has, and opens it. */
-  create(): Promise<Workspace> {
-    const names = new Set(this.state.projects.map((p) => p.name));
-    let name = untitled;
-    for (let n = 2; names.has(name); n++) name = `${untitled} ${n}`;
+  /**
+   * create makes a project with a name no other has, leaving out the one it replaces, and opens
+   * it. The project joins the list once its folder is there.
+   */
+  async create(replacing?: string): Promise<Workspace> {
     const id = this.ids();
-    this.update({ ...this.state, projects: [...this.state.projects, { id, name }] });
+    await this.folders.open(id);
+    this.update((state) => {
+      const names = new Set(state.projects.filter((p) => p.id !== replacing).map((p) => p.name));
+      let name = untitled;
+      for (let n = 2; names.has(name); n++) name = `${untitled} ${n}`;
+      return { ...state, projects: [...state.projects, { id, name }] };
+    });
     return this.open(id);
   }
 
@@ -88,20 +107,21 @@ export class BrowserProjects {
   rename(id: string, name: string) {
     const trimmed = name.trim();
     if (trimmed === "") throw new Error("A project needs a name");
-    if (this.state.projects.some((p) => p.id !== id && p.name === trimmed)) {
-      throw new Error(`There is a project ${trimmed} already`);
-    }
-    this.update({
-      ...this.state,
-      projects: this.state.projects.map((p) => (p.id === id ? { ...p, name: trimmed } : p)),
+    this.update((state) => {
+      if (state.projects.some((p) => p.id !== id && p.name === trimmed)) {
+        throw new Error(`There is a project ${trimmed} already`);
+      }
+      return { ...state, projects: state.projects.map((p) => (p.id === id ? { ...p, name: trimmed } : p)) };
     });
   }
 
   /** remove deletes a project and its files. */
   async remove(id: string): Promise<void> {
     await this.folders.remove(id);
-    const projects = this.state.projects.filter((p) => p.id !== id);
-    this.update({ projects, last: this.state.last === id ? null : this.state.last });
+    this.update((state) => ({
+      projects: state.projects.filter((p) => p.id !== id),
+      last: state.last === id ? null : state.last,
+    }));
   }
 }
 
