@@ -81,6 +81,7 @@ test("the browser keeps the targets for each project, and moves them with it", (
   expect(new RunTargets("project", storage).getState()).toEqual({ selected: null, files: [] });
   expect(targetsKey({ inBrowser: true, name: "Untitled" })).toBe("ant-editor-run:(browser)");
   expect(targetsKey({ inBrowser: false, name: "app" })).toBe("ant-editor-run:app");
+  expect(targetsKey({ inBrowser: false, name: "app", id: "f1" })).toBe("ant-editor-run:(folder)/f1");
   expect(targetsKey({ inBrowser: true, name: "Untitled", id: "workspace" })).toBe("ant-editor-run:(browser)");
   expect(targetsKey({ inBrowser: true, name: "Untitled 2", id: "p1" })).toBe("ant-editor-run:(browser)/p1");
   forgetTargets("folder", storage);

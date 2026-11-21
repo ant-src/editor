@@ -6,7 +6,8 @@ Edit, run and debug [Ant](https://ant-lang.org) programs in the browser, with no
 - **Projects.** Work starts in a project the browser keeps for the page. The project's menu makes
   new ones, renames them, and switches between them; switching saves the one left. It downloads a
   project as a .zip in any browser; in Chrome and Edge on a desktop, _Save to folder_ moves it to a
-  folder on disk and _Open folder_ opens one that exists.
+  folder on disk and _Open folder_ opens one that exists; the folders opened lately are on the menu
+  to open again with a click.
 - **Files.** A right click in the file tree makes, renames and deletes files; a drag moves them.
 - **Run.** Run starts the file named beside it, in WebAssembly, in a worker. _Current File_ is the
   Ant file open in the editor; pick a file that ran before to run it from any tab. _Stop_ ends it.

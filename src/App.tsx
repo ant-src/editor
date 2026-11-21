@@ -40,9 +40,10 @@ import {
   pickFolder,
   supported,
   type TreeNode,
-  type Workspace,
+  Workspace,
 } from "./fs/workspace";
 import { BrowserProjects, type ProjectsState } from "./fs/projects";
+import { RecentFolders, type RecentFolder } from "./fs/recent";
 import { zip } from "./fs/zip";
 import { key } from "./keys";
 import logo from "./logo.svg";
@@ -94,6 +95,8 @@ export function App() {
   const [error, setError] = useState("");
   const current = useRef<Project | null>(null);
   const [projects, setProjects] = useState<BrowserProjects | null>(null);
+  const recent = useMemo(() => (supported() ? new RecentFolders() : null), []);
+  useEffect(() => void recent?.refresh().catch(() => {}), [recent]);
 
   useEffect(() => {
     boot().then(setRunner, (err) => setFailure(String(err?.message ?? err)));
@@ -145,16 +148,48 @@ export function App() {
     return true;
   }, [runner]);
 
+  /** remember puts a folder on disk at the top of the recent folders, and names it by its id there. */
+  const remember = useCallback(
+    async (workspace: Workspace): Promise<Workspace> => {
+      if (!recent) return workspace;
+      try {
+        return new Workspace(workspace.root, false, undefined, await recent.add(workspace.root));
+      } catch {
+        return workspace; // a folder the list cannot keep still opens
+      }
+    },
+    [recent],
+  );
+
   const openFolder = useCallback(async () => {
     setError("");
     try {
-      const workspace = await pickFolder();
-      if (!workspace || !(await leave())) return;
-      await show(workspace);
+      const picked = await pickFolder();
+      if (!picked || !(await leave())) return;
+      await show(await remember(picked));
     } catch (err) {
       setError(String((err as Error)?.message ?? err));
     }
-  }, [leave, show]);
+  }, [leave, show, remember]);
+
+  /** openRecent opens a folder of the recent ones, once the browser allows it. */
+  const openRecent = useCallback(
+    async (id: string) => {
+      try {
+        if (current.current?.workspace.id === id || !recent) return;
+        const workspace = await recent.open(id);
+        if (!workspace) {
+          output.write("warning", "The browser was not allowed to open the folder\n");
+          return;
+        }
+        if (!(await leave())) return;
+        await show(workspace);
+      } catch (err) {
+        output.write("stderr", `Opening a folder: ${(err as Error)?.message ?? err}\n`);
+      }
+    },
+    [recent, leave, show],
+  );
 
   const newProject = useCallback(async () => {
     try {
@@ -220,8 +255,9 @@ export function App() {
     const from = current.current;
     if (!from?.workspace.inBrowser) return;
     try {
-      const target = await pickFolder();
-      if (!target) return;
+      const picked = await pickFolder();
+      if (!picked) return;
+      const target = await remember(picked);
       await from.saveAll();
       const replaced = await target.existing(workspaceFiles((await from.workspace.tree()).nodes));
       if (replaced.length > 0 && !window.confirm(`${target.name} already has ${list(replaced)}. Replace?`)) return;
@@ -239,7 +275,7 @@ export function App() {
     } catch (err) {
       output.write("stderr", `Saving to a folder: ${(err as Error)?.message ?? err}\n`);
     }
-  }, [runner, show, projects]);
+  }, [runner, show, projects, remember]);
 
   if (!project) {
     return <Welcome error={error} />;
@@ -257,6 +293,8 @@ export function App() {
       onOpenProject={openProject}
       onDeleteProject={deleteProject}
       onRenameProject={renameProject}
+      recent={recent}
+      onOpenRecent={openRecent}
     />
   );
 }
@@ -301,13 +339,19 @@ interface IdeProps {
   onDeleteProject(id: string): void;
   /** Names the open project, or returns why it cannot. */
   onRenameProject(name: string): string | undefined;
+  /** The folders on disk opened lately, where the browser can open folders. */
+  recent: RecentFolders | null;
+  onOpenRecent(id: string): void;
 }
 
 const noProjects: ProjectsState = { projects: [], last: null };
+const emptyFolders: readonly RecentFolder[] = [];
+const noFolders = () => emptyFolders;
 
 function Ide(props: IdeProps) {
   const { project, runner, failure, onOpenFolder, onSaveToFolder, projects } = props;
-  const { onNewProject, onOpenProject, onDeleteProject, onRenameProject } = props;
+  const { onNewProject, onOpenProject, onDeleteProject, onRenameProject, recent, onOpenRecent } = props;
+  const folders = useSyncExternalStore(recent?.subscribe ?? noSubscription, recent?.getState ?? noFolders);
   const browser = useSyncExternalStore(projects?.subscribe ?? noSubscription, projects?.getState ?? (() => noProjects));
   const [renaming, setRenaming] = useState(false);
   const files = useSyncExternalStore(project.subscribe, project.getState);
@@ -545,6 +589,16 @@ function Ide(props: IdeProps) {
           })),
         )
       : []),
+    ...(folders.length > 0
+      ? ([{ caption: "Recent folders" }] as MenuEntry[]).concat(
+          folders.map((f) => ({
+            label: f.name,
+            checked: !inBrowser && f.id === project.workspace.id,
+            onSelect: () => void onOpenRecent(f.id),
+            onRemove: () => void recent?.forget(f.id),
+          })),
+        )
+      : []),
     "separator",
     ...(onSaveToFolder ? [{ label: "Save to folder…", onSelect: onSaveToFolder }] : []),
     ...(onOpenFolder ? [{ label: "Open folder…", onSelect: onOpenFolder }] : []),
@@ -630,6 +684,7 @@ function Ide(props: IdeProps) {
               onClick={(e) => {
                 const box = e.currentTarget.getBoundingClientRect();
                 setProjectMenu(projectMenu ? null : { x: box.left, y: box.bottom + 4 });
+                void recent?.refresh().catch(() => {}); // another tab may have opened a folder
               }}
               onDoubleClick={() => inBrowser && setRenaming(true)}
             >

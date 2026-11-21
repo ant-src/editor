@@ -116,10 +116,11 @@ export function moveTargets(from: string, to: string, storage: KeyValue | undefi
 
 /**
  * targetsKey is where the browser keeps the targets of a project: one kept in the browser by its
- * id, the first of them where it was before there were several, and a folder on disk by its name.
+ * id, the first of them where it was before there were several, and a folder on disk by its id
+ * on the list of recent folders, or by its name off it.
  */
 export function targetsKey(workspace: { inBrowser: boolean; name: string; id?: string }): string {
-  if (!workspace.inBrowser) return "ant-editor-run:" + workspace.name;
+  if (!workspace.inBrowser) return "ant-editor-run:" + (workspace.id ? "(folder)/" + workspace.id : workspace.name);
   return "ant-editor-run:(browser)" + (workspace.id && workspace.id !== firstProject ? "/" + workspace.id : "");
 }
 
