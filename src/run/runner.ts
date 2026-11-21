@@ -1,7 +1,7 @@
 // The runner runs and debugs programs in a worker, so that the page stays responsive, and stops
 // one by replacing the worker. Debugging speaks the Debug Adapter Protocol to the adapter in
 // ant.wasm, which stops and steps the program with the interpreter's own debugger.
-import type { DapMessage, FromWorker, Program, ToWorker, WorkerLike } from "./protocol";
+import { isTestFile, type DapMessage, type FromWorker, type Program, type ToWorker, type WorkerLike } from "./protocol";
 
 export type Status =
   /** The worker is loading ant.wasm. */
@@ -159,18 +159,19 @@ export class Runner {
 
   // ---- running
 
-  /** run runs a program to its end. It reports whether the run started. */
+  /** run runs a program to its end, or the tests of a test file. It reports whether the run started. */
   run(program: Program): boolean {
     if (this.state.status !== "idle") return false;
     this.begin(false);
-    this.handlers.output("info", `Running ${program.path}\n`);
-    this.post({ type: "run", program });
+    const tests = isTestFile(program.path);
+    this.handlers.output("info", `${tests ? "Testing" : "Running"} ${program.path}\n`);
+    this.post({ type: tests ? "test" : "run", program });
     return true;
   }
 
   /**
-   * debug runs a program under the debugger, with breakpoints on the lines given for each
-   * module. It reports whether the session started.
+   * debug runs a program, or the tests of a test file, under the debugger, with breakpoints on
+   * the lines given for each module. It reports whether the session started.
    */
   debug(program: Program, breakpoints: Breakpoints = {}): boolean {
     if (this.state.status !== "idle") return false;
@@ -194,7 +195,7 @@ export class Runner {
     try {
       await this.request("initialize", { adapterID: "ant", linesStartAt1: true, columnsStartAt1: true });
       const initialized = this.event("initialized");
-      await this.request("launch", { program: program.path });
+      await this.request("launch", { program: program.path, test: program.test });
       await initialized;
       for (const [path, lines] of Object.entries(breakpoints)) {
         if (lines.length > 0) await this.setBreakpoints(path, lines);

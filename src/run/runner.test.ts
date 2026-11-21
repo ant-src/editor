@@ -271,3 +271,79 @@ test("stop ends a paused session, and a program that does not load never starts"
   expect(h.text("stderr")).toMatch(/^main\.ant:\d+:\d+: /);
   expect(h.text("warning")).toContain("Exited with code 2");
 });
+
+const mathTest = `import "./lib/math.ant" { double }
+
+test "double" {
+  assert(double(2) == 4)
+}
+
+test "sizes" {
+  for n in [1, 2] {
+    test "of ${"$"}{n}" {
+      println("size ${"$"}{n}")
+      var d = double(n)
+      assert(d == 2)
+    }
+  }
+}
+`;
+const tests = { "math_test.ant": mathTest, "lib/math.ant": lib };
+
+test("run runs the tests of a test file and reports them as ant test -v does", async () => {
+  const h = await start();
+  h.runner.run({ files: tests, path: "math_test.ant" });
+  await h.until((s) => s.status === "idle");
+  const all = h.output.map(([, t]) => t).join("");
+  expect(all.replace(/\d+\.\d+s|\d+ ms/g, "T")).toBe(`Testing math_test.ant
+=== RUN   math_test.ant: double
+--- PASS: math_test.ant: double (T)
+=== RUN   math_test.ant: sizes
+=== RUN   math_test.ant: sizes/of 1
+    size 1
+--- PASS: math_test.ant: sizes/of 1 (T)
+=== RUN   math_test.ant: sizes/of 2
+    size 2
+--- FAIL: math_test.ant: sizes/of 2 (T)
+    assertion failed: d == 2 (4 == 2)
+      at test "of 2" (math_test.ant:12:13)
+--- FAIL: math_test.ant: sizes (T)
+FAIL  1 failed, 2 passed (T)
+Exited with code 1 in T
+`);
+  expect(h.text("stderr")).toContain("--- FAIL: math_test.ant: sizes/of 2");
+  expect(h.text("stdout")).toBe("    size 1\n    size 2\n");
+});
+
+test("run runs the tests a pattern selects", async () => {
+  const h = await start();
+  h.runner.run({ files: tests, path: "math_test.ant", test: "^sizes$/^of 1( #[0-9]+)?$" });
+  await h.until((s) => s.status === "idle");
+  expect(h.text("info")).toMatch(/ok {4}1 passed \(.*\)\nFinished in /);
+  expect(h.text("stderr")).toBe("");
+});
+
+test("tests do not run when the checker reports an error", async () => {
+  const h = await start();
+  h.runner.run({ files: { "a_test.ant": 'test "t" {\n  var n: int = "x"\n}\n' }, path: "a_test.ant" });
+  await h.until((s) => s.status === "idle");
+  expect(h.text("stderr")).toMatch(/^a_test\.ant:2:\d+: cannot use string where int is expected\n$/);
+  expect(h.text("warning")).toContain("Exited with code 1");
+});
+
+test("debug stops at a breakpoint in the one test it runs, and where it fails", async () => {
+  const h = await start();
+  h.runner.debug({ files: tests, path: "math_test.ant", test: "^sizes$/^of 2( #[0-9]+)?$" }, { "math_test.ant": [12] });
+  const stop = await h.paused();
+  expect(stop.frames[0]).toMatchObject({ path: "math_test.ant", line: 12 });
+  expect(vars(stop, stop.scopes[0].name)).toMatchObject({ d: "4" });
+  h.runner.resume("next");
+  // the assertion that fails stops the test where it failed, as a panic stops a program
+  const failed = await h.paused();
+  expect(failed).toMatchObject({ reason: "exception", text: "assertion failed: d == 2 (4 == 2)" });
+  h.runner.resume("continue");
+  await h.until((s) => s.status === "idle");
+  expect(h.text("info")).not.toContain("of 1");
+  expect(h.text("stderr")).toContain("--- FAIL: math_test.ant: sizes/of 2");
+  expect(h.text("warning")).toContain("Exited with code 1");
+});

@@ -1,8 +1,9 @@
-// The worker's side of running programs: it loads ant.wasm, runs a program at a time and
-// serves debug sessions, one at a time. It is apart from the worker's entry so that tests can
+// The worker's side of running programs: it loads ant.wasm, runs a program or a test file's
+// tests at a time and serves debug sessions, one at a time. It is apart from the worker's entry so that tests can
 // run it in their own thread.
 import type { Ant, DebugAdapterConnection } from "@ant-lang/wasm";
 import type { FromWorker, ToWorker } from "./protocol";
+import { report } from "./report";
 
 export type LoadAnt = (wasm?: WebAssembly.Module) => Promise<Ant>;
 
@@ -10,20 +11,19 @@ export function createHost(post: (message: FromWorker) => void, load: LoadAnt): 
   let ant: Promise<Ant> | undefined;
   let adapter: Promise<DebugAdapterConnection> | undefined;
 
-  const run = async (data: Extract<ToWorker, { type: "run" }>) => {
+  const run = async ({ type, program }: Extract<ToWorker, { type: "run" | "test" }>) => {
     const decoders = { stdout: new TextDecoder(), stderr: new TextDecoder() };
-    const write = (stream: "stdout" | "stderr", text: string) => text && post({ type: "output", stream, text });
+    const write = (stream: "stdout" | "stderr" | "info", text: string) =>
+      text && post({ type: "output", stream, text });
     const sink = (stream: "stdout" | "stderr") => (chunk: Uint8Array) =>
       write(stream, decoders[stream].decode(chunk, { stream: true }));
+    const io = { files: program.files, stdout: sink("stdout"), stderr: sink("stderr") };
     try {
-      const result = await (
-        await ant!
-      ).run({
-        files: data.program.files,
-        path: data.program.path,
-        stdout: sink("stdout"),
-        stderr: sink("stderr"),
-      });
+      const loaded = await ant!;
+      const result =
+        type === "run"
+          ? await loaded.run({ ...io, path: program.path })
+          : await loaded.test({ ...io, paths: [program.path], run: program.test, onEvent: (e) => write(...report(e)) });
       write("stdout", decoders.stdout.decode());
       write("stderr", decoders.stderr.decode());
       for (const d of result.diagnostics) write("stderr", `${d.path}:${d.line}:${d.column}: ${d.message}\n`);
@@ -43,6 +43,7 @@ export function createHost(post: (message: FromWorker) => void, load: LoadAnt): 
         );
         return;
       case "run":
+      case "test":
         void run(data);
         return;
       case "debug": {

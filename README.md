@@ -11,10 +11,12 @@ Edit, run and debug [Ant](https://ant-lang.org) programs in the browser, with no
 - **Files.** A right click in the file tree makes, renames and deletes files; a drag moves them.
 - **Run.** Run starts the file named beside it, in WebAssembly, in a worker. _Current File_ is the
   Ant file open in the editor; pick a file that ran before to run it from any tab. _Stop_ ends it.
+- **Tests.** Run on a test file, whose name ends in `_test.ant`, runs its tests and reports them
+  as `ant test -v` does. _run test_ and _debug test_ above a test run that one alone.
 - **Problems.** The checker's errors and warnings list under _Problems_, and a run names them in
   the console.
 - **Debug.** Click the gutter to set a breakpoint. A paused program shows its line, call stack and
-  variables.
+  variables. A test that fails pauses at the assertion.
 
 | Key            | Action               |
 | -------------- | -------------------- |

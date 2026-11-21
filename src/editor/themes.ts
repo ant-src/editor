@@ -74,6 +74,8 @@ function theme(base: "vs" | "vs-dark", p: Palette): Monaco.editor.IStandaloneThe
       "editorLineNumber.activeForeground": `#${p.muted}`,
       "editorInlayHint.foreground": `#${p.comment}`,
       "editorInlayHint.background": "#00000000",
+      "editorCodeLens.foreground": `#${p.comment}`,
+      "editorLink.activeForeground": base === "vs" ? "#6d28d9" : "#a78bfa", // a lens under the pointer
       focusBorder: "#7c3aed66",
     },
   };

@@ -30,7 +30,7 @@ import { Count, Problems } from "./components/Problems";
 import { Variables } from "./components/Variables";
 import { ConsoleStore } from "./console";
 import { BreakpointStore } from "./debug/breakpoints";
-import { compileAnt, createModel, monaco, pathOf, startLanguageServer } from "./editor/monaco";
+import { compileAnt, createModel, monaco, onTestCommand, pathOf, startLanguageServer } from "./editor/monaco";
 import {
   basename,
   browserFolders,
@@ -49,7 +49,7 @@ import logo from "./logo.svg";
 import { ProblemStore, runNotes } from "./problems";
 import { isAnt, Project } from "./project";
 import AntWorker from "./run/ant.worker?worker";
-import type { WorkerLike } from "./run/protocol";
+import { isTestFile, type WorkerLike } from "./run/protocol";
 import { Runner, type RunnerState, type StepCommand } from "./run/runner";
 import { forgetTargets, moveTargets, RunTargets, targetsKey } from "./run/targets";
 
@@ -480,18 +480,26 @@ function Ide(props: IdeProps) {
     return () => opener.dispose();
   }, [project, open]);
 
-  /** start runs or debugs the target, or another file given, which joins the files that can be picked. */
-  const start = (debug: boolean, path = entry) => {
+  /**
+   * start runs or debugs the target, or another file given, which joins the files that can be
+   * picked. A test file runs its tests: all of them, or the ones a pattern selects.
+   */
+  const start = (debug: boolean, path = entry, test?: string) => {
     if (runner === null || run.status !== "idle" || path === null) return;
-    const program = { files: project.sources(), path };
+    const program = { files: project.sources(), path, test };
     targets.ran(path);
     output.clear();
     if (debug) runner.debug(program, breakpoints.all());
     else runner.run(program);
     // The run goes ahead with the errors the checker found, but the console says what they are.
-    for (const note of runNotes(problemList)) output.write("warning", note);
+    // Tests run only when their files check, and say why they did not.
+    if (debug || !isTestFile(path)) for (const note of runNotes(problemList)) output.write("warning", note);
     setPanel({ tab: "console", open: true });
   };
+  // The lens above a test runs or debugs it.
+  const startTest = useRef(start);
+  startTest.current = start;
+  useEffect(() => onTestCommand(({ debug, path, pattern }) => startTest.current(debug, path, pattern)), []);
   const step = (command: StepCommand) => runner?.resume(command);
   const save = (path: string | null) =>
     path && project.save(path).catch((err) => output.write("stderr", `${path}: ${(err as Error).message}\n`));
