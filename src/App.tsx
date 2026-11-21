@@ -19,12 +19,12 @@ import {
   ChevronUpIcon,
   ClearIcon,
   CloseIcon,
-  GearIcon,
   RunIcon,
   SidebarIcon,
   StopIcon,
 } from "./components/icons";
 import { Menu, type MenuEntry } from "./components/Menu";
+import { SettingsButton } from "./components/Settings";
 import { Count, Problems } from "./components/Problems";
 import { Variables } from "./components/Variables";
 import { ConsoleStore } from "./console";
@@ -47,7 +47,6 @@ import { key } from "./keys";
 import logo from "./logo.svg";
 import { ProblemStore, runNotes } from "./problems";
 import { isAnt, Project } from "./project";
-import { fontSizes, getSettings, set as setSetting, subscribe as onSettings, themes, type Theme } from "./settings";
 import AntWorker from "./run/ant.worker?worker";
 import type { WorkerLike } from "./run/protocol";
 import { Runner, type RunnerState, type StepCommand } from "./run/runner";
@@ -1017,49 +1016,6 @@ function NameInput(props: { name: string; onSubmit(name: string): string | undef
           {error}
         </span>
       )}
-    </>
-  );
-}
-
-const themeLabels: Record<Theme, string> = { system: "System", light: "Light", dark: "Dark" };
-
-/** SettingsButton opens the menu of the editor's settings: the colors, the text size, wrapping. */
-function SettingsButton() {
-  const settings = useSyncExternalStore(onSettings, getSettings);
-  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
-  const entries: MenuEntry[] = [
-    { caption: "Theme" },
-    ...themes.map((theme) => ({
-      label: themeLabels[theme],
-      checked: settings.theme === theme,
-      onSelect: () => setSetting("theme", theme),
-    })),
-    "separator",
-    { caption: "Font size" },
-    ...fontSizes.map((size) => ({
-      label: `${size}px`,
-      checked: settings.fontSize === size,
-      onSelect: () => setSetting("fontSize", size),
-    })),
-    "separator",
-    { label: "Word wrap", checked: settings.wordWrap, onSelect: () => setSetting("wordWrap", !settings.wordWrap) },
-  ];
-  return (
-    <>
-      <button
-        className="icon-button"
-        title="Settings"
-        aria-label="Settings"
-        aria-haspopup="menu"
-        aria-expanded={at !== null}
-        onClick={(e) => {
-          const box = e.currentTarget.getBoundingClientRect();
-          setAt(at ? null : { x: box.right, y: box.bottom + 4 });
-        }}
-      >
-        <GearIcon />
-      </button>
-      {at && <Menu label="Settings" x={at.x} y={at.y} entries={entries} onClose={() => setAt(null)} />}
     </>
   );
 }

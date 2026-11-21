@@ -12,7 +12,8 @@ export interface Settings {
 }
 
 export const themes: readonly Theme[] = ["system", "light", "dark"];
-export const fontSizes: readonly number[] = [12, 13, 14, 16, 18];
+export const minFontSize = 10;
+export const maxFontSize = 24;
 
 const defaults: Settings = { theme: "system", fontSize: 13, wordWrap: false };
 const keys: Record<keyof Settings, string> = {
@@ -37,7 +38,7 @@ function read(): Settings {
   const fontSize = Number(stored("fontSize"));
   return {
     theme: theme === "light" || theme === "dark" ? theme : defaults.theme,
-    fontSize: fontSizes.includes(fontSize) ? fontSize : defaults.fontSize,
+    fontSize: validFontSize(fontSize) ? fontSize : defaults.fontSize,
     wordWrap: stored("wordWrap") === "on",
   };
 }
@@ -53,6 +54,11 @@ function apply() {
   }
   root.style.setProperty("--code-size", `${settings.fontSize}px`);
   for (const listener of listeners) listener();
+}
+
+/** validFontSize says whether a text size is one the editor takes: a whole number of pixels, 10 to 24. */
+export function validFontSize(size: number): boolean {
+  return Number.isInteger(size) && size >= minFontSize && size <= maxFontSize;
 }
 
 export function getSettings(): Settings {

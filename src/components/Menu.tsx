@@ -1,6 +1,6 @@
 // A menu that opens at a point: a context menu, or the menu under a button. Arrow keys move
 // between its items, Escape and a click elsewhere close it, and focus goes back where it was.
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { CheckIcon, CloseIcon } from "./icons";
 
 export type MenuEntry =
@@ -32,39 +32,7 @@ export interface MenuProps {
 
 export function Menu({ entries, x, y, label, onClose }: MenuProps) {
   const menu = useRef<HTMLDivElement>(null);
-  const [at, setAt] = useState({ x, y });
-  const close = useRef(onClose);
-  close.current = onClose;
-
-  // The menu stays in the window, and its first item takes the focus.
-  useLayoutEffect(() => {
-    const el = menu.current!;
-    const { width, height } = el.getBoundingClientRect();
-    setAt({
-      x: Math.max(4, Math.min(x, window.innerWidth - width - 4)),
-      y: Math.max(4, Math.min(y, window.innerHeight - height - 4)),
-    });
-    items(el)[0]?.focus();
-  }, [x, y]);
-
-  useEffect(() => {
-    const before = document.activeElement as HTMLElement | null;
-    const outside = (e: Event) => {
-      if (!menu.current?.contains(e.target as Node)) close.current();
-    };
-    const dismiss = () => close.current();
-    window.addEventListener("pointerdown", outside, true);
-    window.addEventListener("blur", dismiss);
-    window.addEventListener("resize", dismiss);
-    return () => {
-      window.removeEventListener("pointerdown", outside, true);
-      window.removeEventListener("blur", dismiss);
-      window.removeEventListener("resize", dismiss);
-      // the focus was in the menu, which is gone: it goes back to where it was before
-      const lost = document.activeElement === null || document.activeElement === document.body;
-      if (lost && before?.isConnected) before.focus();
-    };
-  }, []);
+  const at = usePopover(menu, x, y, onClose, (el) => items(el)[0]?.focus());
 
   // Items of a set of choices leave room for the check mark, all of them alike.
   const checkable = entries.some((e) => typeof e === "object" && "onSelect" in e && e.checked !== undefined);
@@ -152,6 +120,53 @@ export function Menu({ entries, x, y, label, onClose }: MenuProps) {
       )}
     </div>
   );
+}
+
+/**
+ * usePopover keeps a box that opens at a point (a menu, a panel) in the window, gives it the
+ * focus, closes it on a click elsewhere, and gives the focus back where it was when it closes.
+ */
+export function usePopover(
+  box: RefObject<HTMLElement | null>,
+  x: number,
+  y: number,
+  onClose: () => void,
+  focus: (el: HTMLElement) => void,
+): { x: number; y: number } {
+  const [at, setAt] = useState({ x, y });
+  const close = useRef(onClose);
+  close.current = onClose;
+
+  useLayoutEffect(() => {
+    const el = box.current!;
+    const { width, height } = el.getBoundingClientRect();
+    setAt({
+      x: Math.max(4, Math.min(x, window.innerWidth - width - 4)),
+      y: Math.max(4, Math.min(y, window.innerHeight - height - 4)),
+    });
+    focus(el);
+  }, [x, y]);
+
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null;
+    const outside = (e: Event) => {
+      if (!box.current?.contains(e.target as Node)) close.current();
+    };
+    const dismiss = () => close.current();
+    window.addEventListener("pointerdown", outside, true);
+    window.addEventListener("blur", dismiss);
+    window.addEventListener("resize", dismiss);
+    return () => {
+      window.removeEventListener("pointerdown", outside, true);
+      window.removeEventListener("blur", dismiss);
+      window.removeEventListener("resize", dismiss);
+      // the focus was in the box, which is gone: it goes back to where it was before
+      const lost = document.activeElement === null || document.activeElement === document.body;
+      if (lost && before?.isConnected) before.focus();
+    };
+  }, []);
+
+  return at;
 }
 
 function items(menu: HTMLElement): HTMLButtonElement[] {

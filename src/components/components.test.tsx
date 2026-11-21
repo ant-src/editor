@@ -4,7 +4,9 @@ import { afterEach, expect, test, vi } from "vitest";
 import type { Scope, Stop, Variable } from "../run/runner";
 import { Console } from "./Console";
 import { FileTree } from "./FileTree";
+import { getSettings, set } from "../settings";
 import { Menu } from "./Menu";
+import { SettingsButton } from "./Settings";
 import { Variables } from "./Variables";
 
 afterEach(cleanup);
@@ -249,4 +251,41 @@ test("a menu item comes off by its button or Delete, and the menu stays open wit
   expect(onClose).not.toHaveBeenCalled();
   rerender(<Menu label="Run" x={0} y={0} entries={entries(["b"])} onClose={onClose} />);
   await waitFor(() => expect(document.activeElement?.textContent).toBe("b"));
+});
+
+test("the settings panel switches the theme, steps and types the font size, and toggles wrapping", () => {
+  render(<SettingsButton />);
+  fireEvent.click(screen.getByLabelText("Settings"));
+  const dialog = screen.getByRole("dialog", { name: "Settings" });
+  expect(document.activeElement).toBe(screen.getByRole("radio", { name: "System" }));
+
+  fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+  expect(getSettings().theme).toBe("dark");
+  fireEvent.keyDown(screen.getByRole("radio", { name: "Dark" }), { key: "ArrowRight" });
+  expect(getSettings().theme).toBe("system");
+
+  const size = screen.getByRole("spinbutton");
+  fireEvent.click(screen.getByLabelText("Larger"));
+  expect(getSettings().fontSize).toBe(14);
+  fireEvent.keyDown(size, { key: "ArrowDown" });
+  expect(getSettings().fontSize).toBe(13);
+  fireEvent.change(size, { target: { value: "20" } });
+  expect(getSettings().fontSize).toBe(13); // not until Enter
+  fireEvent.keyDown(size, { key: "Enter" });
+  expect(getSettings().fontSize).toBe(20);
+  fireEvent.change(size, { target: { value: "99" } });
+  fireEvent.blur(size);
+  expect(getSettings().fontSize).toBe(24);
+  expect((screen.getByLabelText("Larger") as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(size, { target: { value: "abc" } });
+  fireEvent.keyDown(size, { key: "Enter" });
+  expect(getSettings().fontSize).toBe(24);
+
+  fireEvent.click(screen.getByRole("switch", { name: "Word wrap" }));
+  expect(getSettings().wordWrap).toBe(true);
+
+  fireEvent.keyDown(dialog, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  set("fontSize", 13);
+  set("wordWrap", false);
 });
